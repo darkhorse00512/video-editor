@@ -1,0 +1,204 @@
+{
+  "id": "template-7",
+  "name": "Hand Template",
+  "description": "Experiment with text animation.",
+  "createdAt": "2025-04-10T00:13:34.100Z",
+  "updatedAt": "2025-04-10T00:13:34.100Z",
+  "createdBy": {
+    "id": "user-1",
+    "name": "User"
+  },
+  "category": "Custom",
+  "tags": ["custom", "user-created"],
+  "duration": 203,
+  "overlays": [
+    {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720,
+      "durationInFrames": 86,
+      "from": 0,
+      "id": 337525,
+      "rotation": 0,
+      "row": 5,
+      "isDragging": false,
+      "type": "image",
+      "src": "https://images.pexels.com/photos/255527/pexels-photo-255527.jpeg",
+      "styles": {
+        "objectFit": "cover",
+        "animation": {
+          "enter": "fadeIn",
+          "exit": "fadeOut"
+        },
+        "padding": "55px",
+        "paddingBackgroundColor": "#d00120"
+      }
+    },
+    {
+      "left": -5,
+      "top": 57,
+      "width": 585,
+      "height": 296,
+      "durationInFrames": 59,
+      "from": 19,
+      "id": 863266,
+      "row": 0,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "h",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "700",
+        "color": "rgb(10, 9, 9)",
+        "backgroundColor": "",
+        "fontFamily": "font-bungee-inline",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1.1",
+        "textAlign": "center",
+        "letterSpacing": "-0.03em",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "none",
+          "exit": "scale"
+        }
+      }
+    },
+    {
+      "left": 178,
+      "top": 58,
+      "width": 585,
+      "height": 296,
+      "durationInFrames": 54,
+      "from": 24,
+      "id": 985874,
+      "row": 1,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "a",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "700",
+        "color": "rgb(10, 9, 9)",
+        "backgroundColor": "",
+        "fontFamily": "font-bungee-inline",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1.1",
+        "textAlign": "center",
+        "letterSpacing": "-0.03em",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "none",
+          "exit": "scale"
+        }
+      }
+    },
+    {
+      "left": 344,
+      "top": 58,
+      "width": 585,
+      "height": 296,
+      "durationInFrames": 48,
+      "from": 30,
+      "id": 108804,
+      "row": 2,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "n",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "700",
+        "color": "rgb(10, 9, 9)",
+        "backgroundColor": "",
+        "fontFamily": "font-bungee-inline",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1.1",
+        "textAlign": "center",
+        "letterSpacing": "-0.03em",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "none",
+          "exit": "scale"
+        }
+      }
+    },
+    {
+      "left": 511,
+      "top": 57,
+      "width": 585,
+      "height": 296,
+      "durationInFrames": 40,
+      "from": 38,
+      "id": 51349,
+      "row": 3,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "d",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "700",
+        "color": "rgb(10, 9, 9)",
+        "backgroundColor": "",
+        "fontFamily": "font-bungee-inline",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1.1",
+        "textAlign": "center",
+        "letterSpacing": "-0.03em",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "none",
+          "exit": "scale"
+        }
+      }
+    },
+    {
+      "left": 652,
+      "top": 57,
+      "width": 585,
+      "height": 296,
+      "durationInFrames": 32,
+      "from": 46,
+      "id": 21742,
+      "row": 4,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": ".",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "700",
+        "color": "rgb(10, 9, 9)",
+        "backgroundColor": "",
+        "fontFamily": "font-bungee-inline",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1.1",
+        "textAlign": "center",
+        "letterSpacing": "-0.03em",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "none",
+          "exit": "scale"
+        }
+      }
+    }
+  ]
+}

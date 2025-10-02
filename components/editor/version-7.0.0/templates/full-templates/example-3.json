@@ -1,0 +1,144 @@
+{
+  "id": "example-3",
+  "name": "Intro Example",
+  "description": "Are you ready intro template",
+  "createdAt": "2025-04-09T01:45:44.752Z",
+  "updatedAt": "2025-04-09T01:45:44.752Z",
+  "createdBy": {
+    "id": "user-1",
+    "name": "User"
+  },
+  "category": "Custom",
+  "tags": ["Tiktok", "Ad"],
+  "duration": 86,
+  "aspectRatio": "9:16",
+  "overlays": [
+    {
+      "left": 0,
+      "top": 0,
+      "width": 1101,
+      "height": 1924,
+      "durationInFrames": 86,
+      "from": 0,
+      "id": 0,
+      "rotation": 0,
+      "row": 4,
+      "isDragging": false,
+      "type": "video",
+      "content": "https://images.pexels.com/videos/1943483/free-video-1943483.jpg?auto=compress&cs=tinysrgb&fit=crop&h=630&w=1200",
+      "src": "https://videos.pexels.com/video-files/1943483/1943483-uhd_2560_1440_25fps.mp4",
+      "videoStartTime": 0,
+      "styles": {
+        "opacity": 1,
+        "zIndex": 100,
+        "transform": "none",
+        "objectFit": "cover",
+        "animation": {
+          "exit": "fade"
+        }
+      }
+    },
+    {
+      "left": 126,
+      "top": 569,
+      "width": 847,
+      "height": 402,
+      "durationInFrames": 70,
+      "from": 8,
+      "id": 1,
+      "row": 0,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "ARE",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "900",
+        "color": "#FFFFFF",
+        "backgroundColor": "",
+        "fontFamily": "font-sans",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1",
+        "textAlign": "center",
+        "letterSpacing": "0.02em",
+        "textTransform": "uppercase",
+        "textShadow": "2px 2px 0px rgba(0, 0, 0, 0.2)",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "snapRotate"
+        }
+      }
+    },
+    {
+      "left": 126,
+      "top": 927,
+      "width": 847,
+      "height": 402,
+      "durationInFrames": 67,
+      "from": 11,
+      "id": 2,
+      "row": 1,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "YOU",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "900",
+        "color": "#FFFFFF",
+        "backgroundColor": "",
+        "fontFamily": "font-sans",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1",
+        "textAlign": "center",
+        "letterSpacing": "0.02em",
+        "textTransform": "uppercase",
+        "textShadow": "2px 2px 0px rgba(0, 0, 0, 0.2)",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "snapRotate"
+        }
+      }
+    },
+    {
+      "left": -25,
+      "top": 1294,
+      "width": 1164,
+      "height": 251,
+      "durationInFrames": 63,
+      "from": 15,
+      "id": 3,
+      "row": 2,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "READY?",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "900",
+        "color": "#FFFFFF",
+        "backgroundColor": "",
+        "fontFamily": "font-sans",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1",
+        "textAlign": "center",
+        "letterSpacing": "0.02em",
+        "textTransform": "uppercase",
+        "textShadow": "2px 2px 0px rgba(0, 0, 0, 0.2)",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "snapRotate"
+        }
+      }
+    }
+  ]
+}

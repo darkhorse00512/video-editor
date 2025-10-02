@@ -1,0 +1,113 @@
+{
+  "id": "example-2",
+  "name": "Sport",
+  "description": "A custom template created with React Video Editor",
+  "createdAt": "2025-04-10T02:24:50.270Z",
+  "updatedAt": "2025-04-10T02:24:50.270Z",
+  "createdBy": {
+    "id": "user-1",
+    "name": "User"
+  },
+  "category": "Custom",
+  "tags": ["custom", "user-created"],
+  "duration": 353,
+  "aspectRatio": "16:9",
+  "overlays": [
+    {
+      "id": 752284,
+      "type": "sound",
+      "content": "Upbeat Corporate",
+      "src": "https://rwxrdxvxndclnqvznxfj.supabase.co/storage/v1/object/public/sounds/sound-1.mp3?t=2024-11-04T03%3A52%3A06.297Z",
+      "from": 0,
+      "row": 4,
+      "left": 0,
+      "top": 0,
+      "width": 1920,
+      "height": 100,
+      "rotation": 0,
+      "isDragging": false,
+      "durationInFrames": 353,
+      "styles": {
+        "opacity": 1
+      }
+    },
+    {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720,
+      "durationInFrames": 88,
+      "from": 0,
+      "id": 643873,
+      "rotation": 0,
+      "row": 3,
+      "isDragging": false,
+      "type": "video",
+      "content": "https://images.pexels.com/videos/7660624/pexels-photo-7660624.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=630&w=1200",
+      "src": "https://videos.pexels.com/video-files/7660624/7660624-uhd_2560_1440_25fps.mp4",
+      "videoStartTime": 0,
+      "styles": {
+        "opacity": 1,
+        "zIndex": 100,
+        "transform": "none",
+        "objectFit": "cover"
+      }
+    },
+    {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720,
+      "durationInFrames": 263,
+      "from": 84,
+      "id": 215002,
+      "rotation": 0,
+      "row": 2,
+      "isDragging": false,
+      "type": "video",
+      "content": "https://images.pexels.com/videos/5803095/cycling-dirt-bike-drone-engine-5803095.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=630&w=1200",
+      "src": "https://videos.pexels.com/video-files/5803095/5803095-uhd_2560_1440_25fps.mp4",
+      "videoStartTime": 0,
+      "styles": {
+        "opacity": 1,
+        "zIndex": 100,
+        "transform": "none",
+        "objectFit": "cover"
+      }
+    },
+    {
+      "left": 91,
+      "top": 142,
+      "width": 1176,
+      "height": 399,
+      "durationInFrames": 341,
+      "from": 7,
+      "id": 653205,
+      "row": 1,
+      "rotation": 0,
+      "isDragging": false,
+      "type": "text",
+      "content": "BUILD.",
+      "styles": {
+        "fontSize": "3rem",
+        "fontWeight": "900",
+        "color": "#FFFFFF",
+        "backgroundColor": "transparent",
+        "fontFamily": "font-sans",
+        "fontStyle": "normal",
+        "textDecoration": "none",
+        "lineHeight": "1",
+        "textAlign": "center",
+        "letterSpacing": "0.02em",
+        "textShadow": "2px 2px 0px rgba(0, 0, 0, 0.2)",
+        "opacity": 1,
+        "zIndex": 1,
+        "transform": "none",
+        "animation": {
+          "enter": "fade",
+          "exit": "fade"
+        }
+      }
+    }
+  ]
+}
