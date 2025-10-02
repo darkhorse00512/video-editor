@@ -1,0 +1,1341 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import config from "@/config/config";
+import { RootState } from "@/store/store";
+import {
+  Calendar,
+  ChevronRight,
+  Clock,
+  Folder,
+  Home,
+  Search,
+  SortAsc,
+  SortDesc,
+  Star,
+  Video,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import { toast } from "sonner";
+
+// Interface for video data from database
+interface VideoData {
+  id: string;
+  task_id: string;
+  video_id: string;
+  user_uuid: string;
+  model: string;
+  mode: string;
+  prompt: string;
+  duration: number;
+  start_image: string;
+  start_image_url: string;
+  negative_prompt: string;
+  status: string;
+  task_created_at: string;
+  task_completed_at: string;
+  lip_flag: boolean;
+  user_filename?: string;
+  user_notes?: string;
+  user_tags?: string[];
+  rating?: number;
+  favorite?: boolean;
+  video_url?: string;
+  video_path?: string;
+  video_name?: string;
+}
+
+// Interface for folder data from API
+interface FolderData {
+  Key: string;
+}
+
+// Interface for folder structure
+interface FolderStructure {
+  name: string;
+  path: string;
+  children: FolderStructure[];
+  isFolder: boolean;
+}
+
+interface VideoSelectorProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onVideoSelect: (video: VideoData) => void;
+  title?: string;
+  description?: string;
+}
+
+export default function VideoSelector({
+  open,
+  onOpenChange,
+  onVideoSelect,
+  title = "Select Video from Library",
+  description = "Browse your video library and select a video to use",
+}: VideoSelectorProps) {
+  const userData = useSelector((state: RootState) => state.user);
+  
+  console.log("VideoSelector rendered - open:", open, "userData:", userData);
+  const [videos, setVideos] = useState<VideoData[]>([]);
+  const [totalVideosCount, setTotalVideosCount] = useState(0);
+  const [folders, setFolders] = useState<FolderData[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(true);
+  const [videosLoading, setVideosLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedVideo, setSelectedVideo] = useState<VideoData | null>(null);
+
+  // Folder navigation state
+  const [currentPath, setCurrentPath] = useState<string>("");
+  const [folderStructure, setFolderStructure] = useState<FolderStructure[]>([]);
+
+  // File counts and loading states
+  const [folderFileCounts, setFolderFileCounts] = useState<{
+    [key: string]: number;
+  }>({});
+  const [loadingFileCounts, setLoadingFileCounts] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  // Filter state - simplified like VideoFolder
+  const [modelFilter, setModelFilter] = useState<string>("all");
+  const [lipSyncFilter, setLipSyncFilter] = useState<string>("all");
+  const [favoriteFilter, setFavoriteFilter] = useState<boolean | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Extract folder name from full path
+  const extractFolderName = (fullPath: string): string => {
+    // Remove the user ID and "video/" prefix
+    const pathWithoutPrefix = fullPath.replace(/^[^\/]+\/video\//, "");
+    return pathWithoutPrefix;
+  };
+
+  // Encode name for URL
+  const encodeName = (name: string): string => {
+    return encodeURIComponent(name);
+  };
+
+  // Decode name from URL
+  const decodeName = (name: string): string => {
+    return decodeURIComponent(name);
+  };
+
+  // Build folder structure from raw folder data
+  const buildFolderStructure = (
+    folderData: FolderData[]
+  ): FolderStructure[] => {
+    const structure: FolderStructure[] = [];
+    const pathMap = new Map<string, FolderStructure>();
+
+    console.log("Building folder structure from:", folderData);
+
+    folderData.forEach((folder) => {
+      console.log("Processing folder:", folder);
+      console.log("Folder key:", folder.Key);
+
+      // Extract the folder path from the key
+      const folderPath = extractFolderName(folder.Key);
+      console.log("Extracted folder path:", folderPath);
+
+      if (!folderPath) {
+        console.log("No folder path extracted, skipping");
+        return;
+      }
+
+      const pathParts = folderPath.split("/").filter((part) => part.length > 0);
+      console.log("Path parts:", pathParts);
+
+      let currentPath = "";
+
+      pathParts.forEach((part, index) => {
+        const parentPath = currentPath;
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+
+        console.log(
+          `Processing part "${part}", currentPath: "${currentPath}", parentPath: "${parentPath}"`
+        );
+
+        if (!pathMap.has(currentPath)) {
+          const folderNode: FolderStructure = {
+            name: part,
+            path: currentPath,
+            children: [],
+            isFolder: true,
+          };
+
+          pathMap.set(currentPath, folderNode);
+          console.log(`Created folder node:`, folderNode);
+
+          if (parentPath && pathMap.has(parentPath)) {
+            console.log(`Adding to parent "${parentPath}"`);
+            pathMap.get(parentPath)!.children.push(folderNode);
+          } else if (!parentPath) {
+            console.log(`Adding to root structure`);
+            structure.push(folderNode);
+          }
+        }
+      });
+    });
+
+    console.log("Final folder structure:", structure);
+    return structure;
+  };
+
+  // Navigate to folder
+  const navigateToFolder = (folderPath: string) => {
+    setCurrentPath(folderPath);
+    setCurrentPage(1); // Reset to first page when changing folders
+    fetchFolderFiles(folderPath);
+  };
+
+  // Navigate to parent folder
+  const navigateToParent = () => {
+    const pathParts = currentPath.split("/");
+    pathParts.pop();
+    const parentPath = pathParts.join("/");
+    navigateToFolder(parentPath);
+  };
+
+  // Navigate to home (root)
+  const navigateToHome = () => {
+    navigateToFolder("");
+  };
+
+  // Get breadcrumb items
+  const getBreadcrumbItems = () => {
+    if (!currentPath) return [];
+
+    const pathParts = currentPath.split("/");
+    const breadcrumbs = [];
+    let currentPathBuilt = "";
+
+    pathParts.forEach((part, index) => {
+      currentPathBuilt = currentPathBuilt
+        ? `${currentPathBuilt}/${part}`
+        : part;
+      breadcrumbs.push({
+        name: part,
+        path: currentPathBuilt,
+      });
+    });
+
+    return breadcrumbs;
+  };
+
+  // Fetch folders from API
+  useEffect(() => {
+    const fetchFolders = async () => {
+      try {
+        setFoldersLoading(true);
+        
+        // Demo mode - create sample folders for testing
+        const isDemoMode = true; // Set to false for production
+        
+        if (isDemoMode) {
+          // Create demo folder structure
+          const demoFolders: FolderStructure[] = [
+            {
+              name: "My Videos",
+              path: "my-videos",
+              children: [],
+              isFolder: true,
+            },
+            {
+              name: "Templates",
+              path: "templates",
+              children: [],
+              isFolder: true,
+            },
+            {
+              name: "Recent",
+              path: "recent",
+              children: [],
+              isFolder: true,
+            }
+          ];
+          
+          setFolderStructure(demoFolders);
+          setFoldersLoading(false);
+          return;
+        }
+        
+        // Production API call
+        const response = await fetch(`${config.backend_url}/getfoldernames`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer WeInfl3nc3withAI",
+          },
+          body: JSON.stringify({
+            user: userData.id,
+            folder: "video",
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch folders");
+        }
+
+        const data = await response.json();
+        console.log("Raw folders data from API:", data);
+        setFolders(data);
+
+        // Build folder structure
+        const structure = buildFolderStructure(data);
+        console.log("Built folder structure:", structure);
+        setFolderStructure(structure);
+
+        // If no structure was built, create a fallback from the raw data
+        if (structure.length === 0 && data.length > 0) {
+          console.log("No structure built, creating fallback folders");
+          const fallbackFolders = data.map((folder: FolderData) => ({
+            name:
+              folder.Key || extractFolderName(folder.Key) || "Unknown Folder",
+            path: folder.Key || extractFolderName(folder.Key) || "unknown",
+            children: [],
+            isFolder: true,
+          }));
+          console.log("Fallback folders:", fallbackFolders);
+          setFolderStructure(fallbackFolders);
+        }
+      } catch (error) {
+        console.error("Error fetching folders:", error);
+        // Create fallback demo folders on error
+        const fallbackFolders: FolderStructure[] = [
+          {
+            name: "My Videos",
+            path: "my-videos",
+            children: [],
+            isFolder: true,
+          }
+        ];
+        setFolders([]);
+        setFolderStructure(fallbackFolders);
+      } finally {
+        setFoldersLoading(false);
+      }
+    };
+
+    if (open && userData.id) {
+      fetchFolders();
+    }
+  }, [open, userData.id]);
+
+  // Fetch file counts for folders
+  useEffect(() => {
+    const fetchAllFolderFileCounts = async () => {
+      const currentFolders = getCurrentPathFolders();
+
+      // In demo mode, set demo file counts
+      const isDemoMode = true; // Set to false for production
+      
+      if (isDemoMode) {
+        // Set demo file counts for folders
+        const demoCounts: { [key: string]: number } = {};
+        currentFolders.forEach(folder => {
+          demoCounts[folder.path] = Math.floor(Math.random() * 15) + 3; // Random count between 3-18
+        });
+        setFolderFileCounts(demoCounts);
+        return;
+      }
+
+      // Fetch file counts for each immediate children folder of current path
+      for (const folder of currentFolders) {
+        await fetchFolderFileCount(folder.path);
+      }
+    };
+
+    if (folderStructure.length > 0) {
+      fetchAllFolderFileCounts();
+    }
+  }, [folderStructure, userData.id, currentPath]);
+
+  // Fetch videos from current folder
+  const fetchFolderFiles = async (folderPath: string) => {
+    if (!userData.id) return;
+
+    try {
+      setVideosLoading(true);
+
+      // Demo mode - create sample video count
+      const isDemoMode = true; // Set to false for production
+      
+      if (isDemoMode) {
+        // Simulate video count for demo
+        const demoCount = Math.floor(Math.random() * 20) + 5; // Random count between 5-25
+        setTotalVideosCount(demoCount);
+        setCurrentPath(folderPath);
+        setVideosLoading(false);
+        return;
+      }
+
+      // Build the query for counting videos in the current path
+      let countQuery = `${config.supabase_server_url}/video?user_uuid=eq.${userData.id}&status=eq.completed&select=count`;
+
+      if (folderPath === "") {
+        // Root folder: count videos where video_path is empty, null, or undefined
+        countQuery += `&or=(video_path.is.null,video_path.eq."")`;
+      } else {
+        // Subfolder: count videos that are in the specific folder path
+        countQuery += `&video_path=eq.${encodeURIComponent(folderPath)}`;
+      }
+
+      console.log("Count query:", countQuery);
+
+      const response = await fetch(countQuery, {
+        headers: {
+          Authorization: "Bearer WeInfl3nc3withAI",
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const count = data[0]?.count || 0;
+        console.log("Total videos count for path:", folderPath, count);
+        setTotalVideosCount(count);
+
+        // Set current path for future queries
+        setCurrentPath(folderPath);
+      }
+    } catch (error) {
+      console.error("Error fetching video count:", error);
+      // Set demo count on error
+      setTotalVideosCount(10);
+      setCurrentPath(folderPath);
+    } finally {
+      setVideosLoading(false);
+    }
+  };
+
+  // Function to fetch videos with search, sort, and pagination
+  const fetchVideosWithFilters = useCallback(async () => {
+    if (!userData.id) return;
+
+    try {
+      setVideosLoading(true);
+
+      // Demo mode - create sample videos
+      const isDemoMode = true; // Set to false for production
+      
+      if (isDemoMode) {
+        // Create demo videos with complete data structure
+        const demoVideos: VideoData[] = [
+          {
+            id: "demo-video-1",
+            task_id: "task-1",
+            video_id: "15240939-5d12-4332-8463-82995ed98658",
+            user_uuid: userData.id,
+            model: "Demo Model",
+            mode: "demo",
+            prompt: "A beautiful landscape video",
+            duration: 30,
+            start_image: "/images/video-player-placeholder.png",
+            start_image_url: "/images/video-player-placeholder.png",
+            negative_prompt: "",
+            status: "completed",
+            task_created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+            task_completed_at: new Date(Date.now() - 86400000 + 60000).toISOString(), // 1 minute after creation
+            lip_flag: false,
+            user_filename: "demo-video-1.mp4",
+            user_notes: "Demo video for testing",
+            user_tags: ["demo", "test", "landscape"],
+            rating: 5,
+            favorite: false,
+            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
+            video_path: currentPath || "",
+            video_name: "Demo Video 1"
+          },
+          {
+            id: "demo-video-2",
+            task_id: "task-2",
+            video_id: "15240939-5d12-4332-8463-82995ed98659",
+            user_uuid: userData.id,
+            model: "Demo Model 2",
+            mode: "demo",
+            prompt: "Another amazing video with lip sync",
+            duration: 45,
+            start_image: "/images/video-player-placeholder.png",
+            start_image_url: "/images/video-player-placeholder.png",
+            negative_prompt: "",
+            status: "completed",
+            task_created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+            task_completed_at: new Date(Date.now() - 172800000 + 90000).toISOString(), // 1.5 minutes after creation
+            lip_flag: true,
+            user_filename: "demo-video-2.mp4",
+            user_notes: "Demo video with lip sync",
+            user_tags: ["demo", "lip-sync", "portrait"],
+            rating: 4,
+            favorite: true,
+            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
+            video_path: currentPath || "",
+            video_name: "Demo Video 2"
+          },
+          {
+            id: "demo-video-3",
+            task_id: "task-3",
+            video_id: "15240939-5d12-4332-8463-82995ed98660",
+            user_uuid: userData.id,
+            model: "Demo Model 3",
+            mode: "demo",
+            prompt: "Creative abstract video",
+            duration: 60,
+            start_image: "/images/video-player-placeholder.png",
+            start_image_url: "/images/video-player-placeholder.png",
+            negative_prompt: "",
+            status: "completed",
+            task_created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
+            task_completed_at: new Date(Date.now() - 259200000 + 120000).toISOString(), // 2 minutes after creation
+            lip_flag: false,
+            user_filename: "demo-video-3.mp4",
+            user_notes: "Creative abstract video for testing",
+            user_tags: ["demo", "abstract", "creative"],
+            rating: 3,
+            favorite: false,
+            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
+            video_path: currentPath || "",
+            video_name: "Demo Video 3"
+          },
+          {
+            id: "demo-video-4",
+            task_id: "task-4",
+            video_id: "15240939-5d12-4332-8463-82995ed98661",
+            user_uuid: userData.id,
+            model: "Demo Model 4",
+            mode: "demo",
+            prompt: "Professional business video",
+            duration: 25,
+            start_image: "/images/video-player-placeholder.png",
+            start_image_url: "/images/video-player-placeholder.png",
+            negative_prompt: "",
+            status: "completed",
+            task_created_at: new Date(Date.now() - 345600000).toISOString(), // 4 days ago
+            task_completed_at: new Date(Date.now() - 345600000 + 45000).toISOString(), // 45 seconds after creation
+            lip_flag: true,
+            user_filename: "demo-video-4.mp4",
+            user_notes: "Professional business video",
+            user_tags: ["demo", "business", "professional"],
+            rating: 5,
+            favorite: true,
+            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
+            video_path: currentPath || "",
+            video_name: "Demo Video 4"
+          }
+        ];
+        
+        // Apply search filter if needed
+        let filteredVideos = demoVideos;
+        if (searchTerm.trim()) {
+          filteredVideos = demoVideos.filter(video => 
+            video.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            video.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            video.user_filename?.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
+        
+        console.log("Demo videos loaded:", filteredVideos);
+        console.log("Demo video URLs:", filteredVideos.map(v => ({ id: v.id, url: v.video_url })));
+        setVideos(filteredVideos);
+        setTotalVideosCount(filteredVideos.length); // Update count to match filtered videos
+        setVideosLoading(false);
+        return;
+      }
+
+      // Build the base query
+      let query = `${config.supabase_server_url}/video?user_uuid=eq.${userData.id}&status=eq.completed`;
+
+      // Add path filter
+      if (currentPath === "") {
+        // Root folder: show videos where video_path is empty, null, or undefined
+        query += `&or=(video_path.is.null,video_path.eq."")`;
+      } else {
+        // Subfolder: show videos that are in the specific folder path
+        query += `&video_path=eq.${encodeURIComponent(currentPath)}`;
+      }
+
+      // Add search filter if search term exists
+      if (searchTerm.trim()) {
+        query += `&or=(prompt.ilike.*${encodeURIComponent(
+          searchTerm
+        )}*,model.ilike.*${encodeURIComponent(
+          searchTerm
+        )}*,user_filename.ilike.*${encodeURIComponent(searchTerm)}*)`;
+      }
+
+      // Add model filter
+      if (modelFilter !== "all") {
+        query += `&model=eq.${encodeURIComponent(modelFilter)}`;
+      }
+
+      // Add lip sync filter
+      if (lipSyncFilter !== "all") {
+        if (lipSyncFilter === "lip_sync") {
+          query += `&lip_flag=eq.true`;
+        } else if (lipSyncFilter === "regular") {
+          query += `&lip_flag=eq.false`;
+        }
+      }
+
+      // Add favorite filter
+      if (favoriteFilter !== null) {
+        query += `&favorite=eq.${favoriteFilter}`;
+      }
+
+      // Add sorting
+      let orderBy = "";
+      switch (sortBy) {
+        case "newest":
+          orderBy = "task_created_at.desc";
+          break;
+        case "oldest":
+          orderBy = "task_created_at.asc";
+          break;
+        case "duration":
+          orderBy = sortOrder === "asc" ? "duration.asc" : "duration.desc";
+          break;
+        case "model":
+          orderBy = sortOrder === "asc" ? "model.asc" : "model.desc";
+          break;
+        case "name":
+          orderBy =
+            sortOrder === "asc" ? "user_filename.asc" : "user_filename.desc";
+          break;
+        default:
+          orderBy = "task_created_at.desc";
+      }
+      query += `&order=${orderBy}`;
+
+      // Add pagination
+      const offset = (currentPage - 1) * itemsPerPage;
+      query += `&limit=${itemsPerPage}&offset=${offset}`;
+
+      console.log("Fetch videos query:", query);
+
+      const response = await fetch(query, {
+        headers: {
+          Authorization: "Bearer WeInfl3nc3withAI",
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Fetched videos with filters:", data);
+        console.log(
+          "Video IDs:",
+          data.map((v) => ({
+            id: v.id,
+            task_id: v.task_id,
+            video_id: v.video_id,
+          }))
+        );
+        setVideos(data);
+      }
+    } catch (error) {
+      console.error("Error fetching videos with filters:", error);
+      toast.error("Failed to load videos");
+    } finally {
+      setVideosLoading(false);
+    }
+  }, [
+    userData.id,
+    currentPath,
+    searchTerm,
+    modelFilter,
+    lipSyncFilter,
+    favoriteFilter,
+    sortBy,
+    sortOrder,
+    currentPage,
+    itemsPerPage,
+  ]);
+
+  // Fetch videos when filters change
+  useEffect(() => {
+    if (open && userData.id) {
+      // Add timeout to prevent endless loading
+      const timeoutId = setTimeout(() => {
+        fetchVideosWithFilters();
+      }, 100); // Small delay to prevent rapid calls
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [fetchVideosWithFilters, open, userData.id]);
+
+  // Initialize demo data when component opens
+  useEffect(() => {
+    if (open && userData.id) {
+      console.log("Video selector opened, userData:", userData);
+      // Initialize with demo data immediately
+      const isDemoMode = true;
+      if (isDemoMode) {
+        console.log("Setting up demo mode");
+        setFoldersLoading(false);
+        setVideosLoading(false);
+        // Set initial demo video count (4 demo videos)
+        setTotalVideosCount(4);
+      }
+    }
+  }, [open, userData.id]);
+
+  // Fetch folder file count
+  const fetchFolderFileCount = async (folderPath: string) => {
+    if (!userData.id) return;
+
+    try {
+      setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: true }));
+
+      // Demo mode - set demo file counts
+      const isDemoMode = true; // Set to false for production
+      
+      if (isDemoMode) {
+        // Set demo file count based on folder
+        const demoCount = Math.floor(Math.random() * 8) + 2; // Random count between 2-10
+        setFolderFileCounts((prev) => ({ ...prev, [folderPath]: demoCount }));
+        setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: false }));
+        return;
+      }
+
+      const response = await fetch(
+        `${config.supabase_server_url}/video?user_uuid=eq.${userData.id
+        }&status=eq.completed&video_path=eq.${encodeURIComponent(
+          folderPath
+        )}&select=count`,
+        {
+          headers: {
+            Authorization: "Bearer WeInfl3nc3withAI",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const count = data[0]?.count || 0;
+        setFolderFileCounts((prev) => ({ ...prev, [folderPath]: count }));
+      }
+    } catch (error) {
+      console.error("Error fetching folder file count:", error);
+      // Set demo count on error
+      setFolderFileCounts((prev) => ({ ...prev, [folderPath]: 5 }));
+    } finally {
+      setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: false }));
+    }
+  };
+
+  // Clear filters
+  const clearFilters = () => {
+    setSearchTerm("");
+    setModelFilter("all");
+    setLipSyncFilter("all");
+    setFavoriteFilter(null);
+    setSortBy("newest");
+    setSortOrder("desc");
+    setCurrentPage(1);
+  };
+
+  // Get current path folders
+  const getCurrentPathFolders = (): FolderStructure[] => {
+    if (!currentPath) return folderStructure;
+
+    const findFolder = (
+      folders: FolderStructure[],
+      path: string
+    ): FolderStructure | null => {
+      for (const folder of folders) {
+        if (folder.path === path) return folder;
+        const found = findFolder(folder.children, path);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const currentFolder = findFolder(folderStructure, currentPath);
+    return currentFolder ? currentFolder.children : [];
+  };
+
+  // Get current path raw folders
+  const getCurrentPathRawFolders = (): FolderData[] => {
+    if (!currentPath) return folders;
+
+    return folders.filter((folder) => {
+      const extractedPath = extractFolderName(folder.Key);
+      return (
+        extractedPath.startsWith(currentPath + "/") &&
+        extractedPath.split("/").length === currentPath.split("/").length + 1
+      );
+    });
+  };
+
+  // Handle video selection
+  const handleVideoSelect = (video: VideoData) => {
+    // Ensure the video has the correct URL before passing it
+    const videoWithUrl = {
+      ...video,
+      video_url: getVideoUrl(video),
+    };
+    onVideoSelect(videoWithUrl);
+    onOpenChange(false);
+    toast.success(`Selected: ${video.prompt.substring(0, 50)}...`);
+  };
+
+  // Pagination functions
+  const totalPages = Math.ceil(totalVideosCount / itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
+  const goToFirstPage = () => handlePageChange(1);
+  const goToLastPage = () => handlePageChange(totalPages);
+  const goToPreviousPage = () => handlePageChange(Math.max(1, currentPage - 1));
+  const goToNextPage = () =>
+    handlePageChange(Math.min(totalPages, currentPage + 1));
+
+  // Video helper functions
+  const getVideoUrl = (video: VideoData) => {
+    let videoUrl = "";
+    
+    // Use video_url if available, otherwise construct from video_path and video_name
+    if (video.video_url) {
+      videoUrl = video.video_url;
+    } else {
+      const fileName =
+        video.video_name && video.video_name.trim() !== ""
+          ? video.video_name
+          : video.video_id;
+      videoUrl = `${config.data_url}/${userData.id}/video/${video.video_path ? video.video_path + "/" : ""
+        }${fileName}.mp4`;
+    }
+    
+    // Use proxy for external URLs to avoid CORS issues
+    if (videoUrl.startsWith('http')) {
+      return `/api/video-proxy?url=${encodeURIComponent(videoUrl)}`;
+    }
+    
+    return videoUrl;
+  };
+
+  const formatVideoDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
+  const formatVideoDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getVideoStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-500/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800";
+      case "processing":
+        return "bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800";
+      case "failed":
+        return "bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800";
+      case "pending":
+        return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800";
+      default:
+        return "bg-gray-500/20 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-800";
+    }
+  };
+
+  const getVideoModelDisplayName = (model: string) => {
+    switch (model) {
+      case "kling-v2.1":
+        return "Kling 2.1";
+      case "kling-v2.1-master":
+        return "Kling 2.1 Master";
+      case "seedance-1-lite":
+        return "Seedance 1 Lite";
+      case "seedance-1-pro":
+        return "Seedance 1 Pro";
+      case "wan-2.1-i2v-480p":
+        return "WAN 2.1 480p";
+      case "wan-2.1-i2v-720p":
+        return "WAN 2.1 720p";
+      default:
+        return model;
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto overflow-x-hidden">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+              <Video className="w-5 h-5 text-white" />
+            </div>
+            {title}
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </DialogHeader>
+
+        <div className="flex flex-col h-full space-y-4">
+          {/* Breadcrumb Navigation */}
+          <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={navigateToHome}
+              className="h-8 px-2 text-sm font-medium"
+            >
+              <Home className="w-4 h-4 mr-1" /> Home
+            </Button>
+            {getBreadcrumbItems().map((item, index) => (
+              <div key={item.path} className="flex items-center gap-2">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigateToFolder(item.path)}
+                  className="h-8 px-2 text-sm font-medium"
+                >
+                  {decodeName(item.name)}
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Search and Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search videos by prompt, model, or filename..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Model Filter */}
+            <Select value={modelFilter} onValueChange={setModelFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Models</SelectItem>
+                <SelectItem value="kling-v2.1">Kling 2.1</SelectItem>
+                <SelectItem value="kling-v2.1-master">
+                  Kling 2.1 Master
+                </SelectItem>
+                <SelectItem value="seedance-1-lite">Seedance 1 Lite</SelectItem>
+                <SelectItem value="seedance-1-pro">Seedance 1 Pro</SelectItem>
+                <SelectItem value="wan-2.1-i2v-480p">WAN 2.1 480p</SelectItem>
+                <SelectItem value="wan-2.1-i2v-720p">WAN 2.1 720p</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Lip Sync Filter */}
+            <Select value={lipSyncFilter} onValueChange={setLipSyncFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="lip_sync">Lip Sync</SelectItem>
+                <SelectItem value="regular">Regular</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Favorite Filter */}
+            <Select
+              value={
+                favoriteFilter === null
+                  ? "all"
+                  : favoriteFilter
+                    ? "true"
+                    : "false"
+              }
+              onValueChange={(value) =>
+                setFavoriteFilter(value === "all" ? null : value === "true")
+              }
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Favorite" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Videos</SelectItem>
+                <SelectItem value="true">Favorites</SelectItem>
+                <SelectItem value="false">Not Favorites</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sort */}
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="oldest">Oldest</SelectItem>
+                <SelectItem value="duration">Duration</SelectItem>
+                <SelectItem value="model">Model</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sort Order */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setSortOrder(sortOrder === "desc" ? "asc" : "desc")
+              }
+            >
+              {sortOrder === "desc" ? (
+                <SortDesc className="w-4 h-4" />
+              ) : (
+                <SortAsc className="w-4 h-4" />
+              )}
+            </Button>
+
+            {/* Clear Filters */}
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Folders Section */}
+          {getCurrentPathFolders().length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Folders
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {getCurrentPathFolders().map((folder) => (
+                  <Card
+                    key={folder.path}
+                    className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-blue-200 dark:hover:border-blue-800 group"
+                    onClick={() => navigateToFolder(folder.path)}
+                  >
+                    <CardContent className="p-3 text-center">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform duration-200">
+                        <Folder className="w-6 h-6 text-white" />
+                      </div>
+                      <p className="text-xs font-medium truncate">
+                        {decodeName(folder.name)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {loadingFileCounts[folder.path] ? (
+                          <div className="animate-pulse bg-gray-200 dark:bg-gray-700 h-3 w-8 rounded mx-auto mt-1"></div>
+                        ) : (
+                          `${folderFileCounts[folder.path] || 0} videos`
+                        )}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Videos Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Videos ({totalVideosCount})
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Show:</span>
+                <Select
+                  value={itemsPerPage.toString()}
+                  onValueChange={(value) =>
+                    handleItemsPerPageChange(parseInt(value))
+                  }
+                >
+                  <SelectTrigger className="w-20 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Videos Grid */}
+            {console.log("Rendering videos grid - videosLoading:", videosLoading, "videos.length:", videos.length, "videos:", videos)}
+            {videosLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {[...Array(itemsPerPage)].map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-4">
+                      <div className="aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg mb-3"></div>
+                      <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : videos.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {videos.map((video) => (
+                  <Card
+                    key={video.id}
+                    className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-blue-300 dark:hover:border-blue-600 group hover:scale-[1.02] hover:-translate-y-1"
+                    onClick={() => handleVideoSelect(video)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="relative bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 rounded-lg overflow-hidden mb-3 aspect-video">
+                        <video
+                          src={getVideoUrl(video)}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          preload="metadata"
+                          muted
+                          loop
+                          poster={video.start_image_url || "/images/video-player-placeholder.png"}
+                          onLoadStart={() => console.log("Video loading started:", getVideoUrl(video))}
+                          onLoadedMetadata={() => console.log("Video metadata loaded:", video.id)}
+                          onError={(e) => {
+                            console.error("Video load error:", e, getVideoUrl(video));
+                            // Hide video and show fallback image
+                            const videoElement = e.target as HTMLVideoElement;
+                            videoElement.style.display = 'none';
+                            const fallbackImg = videoElement.parentElement?.querySelector('.fallback-image') as HTMLImageElement;
+                            if (fallbackImg) {
+                              fallbackImg.style.display = 'block';
+                            }
+                          }}
+                          onMouseEnter={(e) => {
+                            const videoElement = e.target as HTMLVideoElement;
+                            videoElement.currentTime = 0;
+                            videoElement.play().catch((err) => console.log("Play failed:", err));
+                          }}
+                          onMouseLeave={(e) => {
+                            const videoElement = e.target as HTMLVideoElement;
+                            videoElement.pause();
+                          }}
+                        />
+                        
+                        {/* Fallback image for when video fails to load */}
+                        <img
+                          src={video.start_image_url || "/images/video-player-placeholder.png"}
+                          alt={video.prompt}
+                          className="fallback-image w-full h-full object-cover hidden"
+                          onError={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            img.src = "/images/video-player-placeholder.png";
+                          }}
+                        />
+
+                        {/* Enhanced Overlay without play button */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+
+                        {/* Status badge */}
+                        <div className="absolute top-3 right-3">
+                          <Badge
+                            className={`${getVideoStatusColor(
+                              video.status
+                            )} text-xs font-medium px-2 py-1`}
+                          >
+                            {video.status}
+                          </Badge>
+                        </div>
+
+                        {/* Favorite indicator */}
+                        {video.favorite && (
+                          <div className="absolute top-3 left-3">
+                            <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-lg">
+                              <Star className="w-4 h-4 text-white fill-current" />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Duration overlay */}
+                        <div className="absolute bottom-3 right-3">
+                          <div className="bg-black/70 text-white text-xs px-2 py-1 rounded-md font-medium">
+                            {formatVideoDuration(video.duration)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Enhanced Video Info */}
+                      <div className="space-y-3">
+                        {/* Title and model */}
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100 line-clamp-2 leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                            {video.user_filename ||
+                              video.prompt.substring(0, 60)}
+                          </h4>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge
+                              variant="secondary"
+                              className="text-xs px-2 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 dark:from-blue-900/30 dark:to-indigo-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-700"
+                            >
+                              {getVideoModelDisplayName(video.model)}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs px-2 py-1 ${video.lip_flag
+                                  ? "border-green-300 text-green-700 dark:text-green-400 dark:border-green-600"
+                                  : "border-gray-300 text-gray-700 dark:text-gray-400 dark:border-gray-600"
+                                }`}
+                            >
+                              {video.lip_flag ? "Lip Sync" : "Regular"}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors duration-200">
+                          {video.prompt}
+                        </p>
+
+                        {/* Enhanced Date and Duration */}
+                        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>
+                              {formatVideoDate(video.task_created_at)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                            <Clock className="w-3 h-3" />
+                            <span className="font-medium">
+                              {formatVideoDuration(video.duration)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Video className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No videos found</h3>
+                <p className="text-muted-foreground">
+                  {searchTerm ||
+                    modelFilter !== "all" ||
+                    lipSyncFilter !== "all" ||
+                    favoriteFilter !== null
+                    ? "Try adjusting your search or filters"
+                    : "This folder is empty. Create some videos to get started!"}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalVideosCount > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                {Math.min(currentPage * itemsPerPage, totalVideosCount)} of{" "}
+                {totalVideosCount} videos
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToFirstPage}
+                  disabled={currentPage === 1}
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={
+                          currentPage === pageNum ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToLastPage}
+                  disabled={currentPage === totalPages}
+                >
+                  Last
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, Film, Video } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -11,6 +11,8 @@ import { useAspectRatio } from "../../../hooks/use-aspect-ratio";
 import { useTimeline } from "../../../contexts/timeline-context";
 import { ClipOverlay, Overlay, OverlayType } from "../../../types";
 import { VideoDetails } from "./video-details";
+import VideoSelector from "./video-selector";
+import config from "@/config/config";
 
 interface PexelsVideoFile {
   quality: string;
@@ -54,6 +56,7 @@ export const VideoOverlayPanel: React.FC = () => {
   const { getAspectRatioDimensions } = useAspectRatio();
   const { visibleRows } = useTimeline();
   const [localOverlay, setLocalOverlay] = useState<Overlay | null>(null);
+  const [showVideoSelector, setShowVideoSelector] = useState(false);
 
   useEffect(() => {
     if (selectedOverlayId === null) {
@@ -75,6 +78,76 @@ export const VideoOverlayPanel: React.FC = () => {
     if (searchQuery.trim()) {
       fetchVideos(searchQuery);
     }
+  };
+
+  // Handle video selection from video selector
+  const handleVideoSelect = (videoData: any) => {
+    console.log("Selected video data:", videoData);
+    
+    const { width, height } = getAspectRatioDimensions();
+    const { from, row } = findNextAvailablePosition(
+      overlays,
+      visibleRows,
+      durationInFrames
+    );
+
+    // Build video URL with fallbacks
+    let videoUrl = "";
+    if (videoData.video_url) {
+      // Use proxy for external URLs to avoid CORS issues
+      if (videoData.video_url.startsWith('http')) {
+        videoUrl = `/api/video-proxy?url=${encodeURIComponent(videoData.video_url)}`;
+      } else {
+        videoUrl = videoData.video_url;
+      }
+    } else if (videoData.user_uuid && videoData.video_id) {
+      const originalUrl = `${config.data_url}/${videoData.user_uuid}/video/${videoData.video_id}.mp4`;
+      videoUrl = `/api/video-proxy?url=${encodeURIComponent(originalUrl)}`;
+    } else {
+      // Fallback to a CORS-friendly video URL
+      videoUrl = "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4";
+    }
+
+    // Build thumbnail URL with fallbacks
+    let thumbnailUrl = "";
+    if (videoData.start_image_url) {
+      thumbnailUrl = videoData.start_image_url;
+    } else if (videoData.start_image) {
+      thumbnailUrl = videoData.start_image;
+    } else {
+      thumbnailUrl = videoUrl; // Use video URL as thumbnail if no separate thumbnail
+    }
+
+    // Calculate duration in frames (default to 200 frames if duration is not available)
+    const durationInSeconds = videoData.duration || 6.67; // Default to ~200 frames at 30fps
+    const durationInFrames = Math.round(durationInSeconds * 30);
+    
+    const newOverlay: Overlay = {
+      left: 0,
+      top: 0,
+      width,
+      height,
+      durationInFrames: durationInFrames,
+      from,
+      id: Date.now(),
+      rotation: 0,
+      row,
+      isDragging: false,
+      type: OverlayType.VIDEO,
+      content: thumbnailUrl,
+      src: videoUrl,
+      videoStartTime: 0,
+      styles: {
+        opacity: 1,
+        zIndex: 100,
+        transform: "none",
+        objectFit: "cover",
+      },
+    };
+
+    console.log("Created overlay:", newOverlay);
+    addOverlay(newOverlay);
+    setShowVideoSelector(false);
   };
 
   const handleAddClip = (video: PexelsVideo) => {
@@ -153,6 +226,62 @@ export const VideoOverlayPanel: React.FC = () => {
             </Button>
           </form>
 
+          {/* Video Library Button */}
+          <div className="mb-4">
+            <Button
+              onClick={() => setShowVideoSelector(true)}
+              variant="outline"
+              className="w-full bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40"
+            >
+              <Video className="h-4 w-4 mr-2" />
+              Browse Video Library
+            </Button>
+          </div>
+
+          {/* Custom Video Button */}
+          <div className="mb-4">
+            <Button
+              onClick={() => {
+                const { width, height } = getAspectRatioDimensions();
+                const { from, row } = findNextAvailablePosition(
+                  overlays,
+                  visibleRows,
+                  durationInFrames
+                );
+
+                const customVideoOverlay: Overlay = {
+                  left: 0,
+                  top: 0,
+                  width,
+                  height,
+                  durationInFrames: 200,
+                  from,
+                  id: Date.now(),
+                  rotation: 0,
+                  row,
+                  isDragging: false,
+                  type: OverlayType.VIDEO,
+                  content: "/images/video-player-placeholder.png",
+                  src: "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
+                  videoStartTime: 0,
+                  styles: {
+                    opacity: 1,
+                    zIndex: 100,
+                    transform: "none",
+                    objectFit: "cover",
+                  },
+                };
+
+                addOverlay(customVideoOverlay);
+              }}
+              variant="outline"
+              className="w-full bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+            >
+              <Film className="h-4 w-4 mr-2" />
+              Add Custom Video
+            </Button>
+          </div>
+
           <div className="columns-2 sm:columns-2 gap-3 space-y-3">
             {isLoading ? (
               Array.from({ length: 16 }).map((_, index) => (
@@ -189,6 +318,15 @@ export const VideoOverlayPanel: React.FC = () => {
           setLocalOverlay={handleUpdateOverlay}
         />
       )}
+
+      {/* Video Selector Dialog */}
+      <VideoSelector
+        open={showVideoSelector}
+        onOpenChange={setShowVideoSelector}
+        onVideoSelect={handleVideoSelect}
+        title="Select Video from Library"
+        description="Browse your video library and select a video to use in your project"
+      />
     </div>
   );
 };

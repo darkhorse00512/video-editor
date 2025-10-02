@@ -215,7 +215,12 @@ export const useKeyframes = ({
           };
 
           const onError = (e: ErrorEvent) => {
-            reject(new Error(`Failed to load video metadata: ${e.message}`));
+            console.warn(`Video loading failed (likely CORS): ${tempVideo.src}`);
+            // Return default dimensions instead of rejecting
+            resolve({
+              width: 1280,
+              height: 720,
+            });
             cleanup();
           };
 

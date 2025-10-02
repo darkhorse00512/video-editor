@@ -74,9 +74,8 @@ export const DEFAULT_OVERLAYS: Overlay[] = [
     row: 3,
     isDragging: false,
     type: OverlayType.VIDEO,
-    content:
-      "https://images.pexels.com/videos/2821900/free-video-2821900.jpg?auto=compress&cs=tinysrgb&fit=crop&h=630&w=1200",
-    src: "https://videos.pexels.com/video-files/2821900/2821900-hd_1280_720_25fps.mp4",
+    content: "/images/video-player-placeholder.png",
+    src: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
     videoStartTime: 0,
     styles: {
       opacity: 1,
@@ -244,9 +243,8 @@ export const DEFAULT_OVERLAYS: Overlay[] = [
     row: 3,
     isDragging: false,
     type: OverlayType.VIDEO,
-    content:
-      "https://images.pexels.com/videos/3044090/free-video-3044090.jpg?auto=compress&cs=tinysrgb&fit=crop&h=630&w=1200",
-    src: "https://videos.pexels.com/video-files/3044090/3044090-uhd_2560_1440_24fps.mp4",
+    content: "/images/video-player-placeholder.png",
+    src: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
     videoStartTime: 0,
     styles: {
       opacity: 1,

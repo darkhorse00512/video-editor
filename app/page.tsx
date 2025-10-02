@@ -1,23 +1,40 @@
-import Navbar from "@/components/shared/navbar";
-import VersionChangeLog from "@/components/shared/version-change-log";
+import ReactVideoEditor from "@/components/editor/version-7.0.0/react-video-editor";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AuthWrapper } from "@/components/Auth/AuthWrapper";
 
 export default function Home() {
+  /**
+   * A project ID represents a unique editing session or workspace for a user.
+   *
+   * Each project ID:
+   * - Acts as a container for a specific editing session
+   * - Can store multiple overlays, templates, and editing configurations
+   * - Allows users to maintain separate workspaces for different videos/projects
+   * - Persists the editing state across browser sessions
+   *
+   * Users can have multiple project IDs, enabling them to:
+   * - Work on different videos simultaneously
+   * - Maintain separate template collections
+   * - Switch between different editing contexts
+   *
+   * Example use cases:
+   * - A user creating different video styles for various social media platforms
+   * - Managing separate projects for personal and professional content
+   * - Creating template collections for different types of videos
+   */
+  const PROJECT_ID = "DEFAULT_RVE_PROJECT";
+
   return (
-    <div>
-      <Navbar />
-      <div className="bg-gradient-to-tr from-gray-900 via-gray-900 to-blue-900/30 relative overflow-hidden min-h-screen">
-        <div className="w-full h-full absolute flex flex-row justify-between left-0 lg:h-full lg:max-w-7xl lg:px-0 mx-auto px-0 right-0">
-          <div className="w-1/3 lg:w-full h-full border-white/5 border-x "></div>
-          <div className="hidden lg:block w-full h-full border-white/5 border-x"></div>
-          <div className="w-1/3 lg:w-full h-full border-white/5 border-x"></div>
-          <div className="hidden lg:block w-full h-full border-white/5 border-x"></div>
-          <div className="w-1/3 lg:w-full h-full border-white/5 border-x"></div>
-          <div className="hidden lg:block w-full h-full border-white/5 border-x"></div>
-        </div>
-        <div className="grid min-h-screen pl-8 pr-8 pb-20 gap-16 sm:p-12 font-[family-name:var(--font-geist-sans)]">
-          <VersionChangeLog />
-        </div>
-      </div>
-    </div>
+    <AuthWrapper>
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "350px",
+          } as React.CSSProperties
+        }
+      >
+        <ReactVideoEditor projectId={PROJECT_ID} />
+      </SidebarProvider>
+    </AuthWrapper>
   );
 }

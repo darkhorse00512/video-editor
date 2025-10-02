@@ -42,6 +42,10 @@ import { StickersPanel } from "../overlays/stickers/stickers-panel";
 import { TemplateOverlayPanel } from "../overlays/templates/template-overlay-panel";
 import { useEditorContext } from "../../contexts/editor-context";
 import { Button } from "@/components/ui/button";
+import { useDispatch } from "react-redux";
+import { clearUser } from "@/store/slices/userSlice";
+import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 
 /**
  * AppSidebar Component
@@ -57,6 +61,23 @@ import { Button } from "@/components/ui/button";
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { activePanel, setActivePanel, setIsOpen } = useSidebar();
   const { setSelectedOverlayId, selectedOverlayId } = useEditorContext();
+  const dispatch = useDispatch();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // Clear user data from Redux store
+    dispatch(clearUser());
+    
+    // Clear tokens from sessionStorage
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem("access_token");
+      sessionStorage.removeItem("refresh_token");
+      localStorage.removeItem("user_data");
+    }
+    
+    // Redirect to login
+    router.push("/login");
+  };
 
   const getPanelTitle = (type: OverlayType): string => {
     switch (type) {
@@ -185,10 +206,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <a href="#">
                   <div className="flex aspect-square size-9 items-center justify-center rounded-lg">
                     <Image
-                      src="/icons/logo-rve.png"
+                      src="/logo.jpg"
                       alt="Logo"
                       width={27}
                       height={27}
+                      className="object-contain"
+                      priority
+                      unoptimized
                     />
                   </div>
                 </a>
@@ -243,6 +267,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               >
                 <Link href="/">V7</Link>
               </SidebarMenuButton>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="w-3 h-3 mr-1" />
+                Logout
+              </Button>
             </div>
           </SidebarMenu>
         </SidebarFooter>
