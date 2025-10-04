@@ -89,8 +89,9 @@ export default function VideoSelector({
   title = "Select Video from Library",
   description = "Browse your video library and select a video to use",
 }: VideoSelectorProps) {
-  const userData = useSelector((state: RootState) => state.user);
-  
+  const userState = useSelector((state: RootState) => state.user);
+  const userData = userState.user;
+
   console.log("VideoSelector rendered - open:", open, "userData:", userData);
   const [videos, setVideos] = useState<VideoData[]>([]);
   const [totalVideosCount, setTotalVideosCount] = useState(0);
@@ -222,11 +223,11 @@ export default function VideoSelector({
   };
 
   // Get breadcrumb items
-  const getBreadcrumbItems = () => {
+  const getBreadcrumbItems = (): Array<{ name: string; path: string }> => {
     if (!currentPath) return [];
 
     const pathParts = currentPath.split("/");
-    const breadcrumbs = [];
+    const breadcrumbs: Array<{ name: string; path: string }> = [];
     let currentPathBuilt = "";
 
     pathParts.forEach((part, index) => {
@@ -247,53 +248,32 @@ export default function VideoSelector({
     const fetchFolders = async () => {
       try {
         setFoldersLoading(true);
-        
-        // Demo mode - create sample folders for testing
-        const isDemoMode = true; // Set to false for production
-        
-        if (isDemoMode) {
-          // Create demo folder structure
-          const demoFolders: FolderStructure[] = [
-            {
-              name: "My Videos",
-              path: "my-videos",
-              children: [],
-              isFolder: true,
-            },
-            {
-              name: "Templates",
-              path: "templates",
-              children: [],
-              isFolder: true,
-            },
-            {
-              name: "Recent",
-              path: "recent",
-              children: [],
-              isFolder: true,
-            }
-          ];
-          
-          setFolderStructure(demoFolders);
+
+        // Get access token from sessionStorage
+        const accessToken = typeof window !== 'undefined' ? sessionStorage.getItem("access_token") : null;
+
+        if (!accessToken) {
+          console.error("No access token found for folder fetch");
+          toast.error("Authentication required. Please log in again.");
           setFoldersLoading(false);
           return;
         }
-        
-        // Production API call
+
+        // Production API call to get folder names
         const response = await fetch(`${config.backend_url}/getfoldernames`, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
             Authorization: "Bearer WeInfl3nc3withAI",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            user: userData.id,
+            user: userData?.id,
             folder: "video",
           }),
         });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch folders");
+          throw new Error(`Failed to fetch folders: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
@@ -320,44 +300,24 @@ export default function VideoSelector({
         }
       } catch (error) {
         console.error("Error fetching folders:", error);
-        // Create fallback demo folders on error
-        const fallbackFolders: FolderStructure[] = [
-          {
-            name: "My Videos",
-            path: "my-videos",
-            children: [],
-            isFolder: true,
-          }
-        ];
+        toast.error("Failed to load folders. Please try again.");
+        // Create empty folder structure on error
         setFolders([]);
-        setFolderStructure(fallbackFolders);
+        setFolderStructure([]);
       } finally {
         setFoldersLoading(false);
       }
     };
 
-    if (open && userData.id) {
+    if (open && userData?.id) {
       fetchFolders();
     }
-  }, [open, userData.id]);
+  }, [open, userData?.id]);
 
   // Fetch file counts for folders
   useEffect(() => {
     const fetchAllFolderFileCounts = async () => {
       const currentFolders = getCurrentPathFolders();
-
-      // In demo mode, set demo file counts
-      const isDemoMode = true; // Set to false for production
-      
-      if (isDemoMode) {
-        // Set demo file counts for folders
-        const demoCounts: { [key: string]: number } = {};
-        currentFolders.forEach(folder => {
-          demoCounts[folder.path] = Math.floor(Math.random() * 15) + 3; // Random count between 3-18
-        });
-        setFolderFileCounts(demoCounts);
-        return;
-      }
 
       // Fetch file counts for each immediate children folder of current path
       for (const folder of currentFolders) {
@@ -368,29 +328,27 @@ export default function VideoSelector({
     if (folderStructure.length > 0) {
       fetchAllFolderFileCounts();
     }
-  }, [folderStructure, userData.id, currentPath]);
+  }, [folderStructure, userData?.id, currentPath]);
 
   // Fetch videos from current folder
   const fetchFolderFiles = async (folderPath: string) => {
-    if (!userData.id) return;
+    if (!userData?.id) return;
 
     try {
       setVideosLoading(true);
 
-      // Demo mode - create sample video count
-      const isDemoMode = true; // Set to false for production
-      
-      if (isDemoMode) {
-        // Simulate video count for demo
-        const demoCount = Math.floor(Math.random() * 20) + 5; // Random count between 5-25
-        setTotalVideosCount(demoCount);
-        setCurrentPath(folderPath);
+      // Get access token from sessionStorage
+      const accessToken = typeof window !== 'undefined' ? sessionStorage.getItem("access_token") : null;
+
+      if (!accessToken) {
+        console.error("No access token found for folder files fetch");
+        toast.error("Authentication required. Please log in again.");
         setVideosLoading(false);
         return;
       }
 
       // Build the query for counting videos in the current path
-      let countQuery = `${config.supabase_server_url}/video?user_uuid=eq.${userData.id}&status=eq.completed&select=count`;
+      let countQuery = `${config.supabase_server_url}/video?user_uuid=eq.${userData?.id}&status=eq.completed&select=count`;
 
       if (folderPath === "") {
         // Root folder: count videos where video_path is empty, null, or undefined
@@ -404,7 +362,7 @@ export default function VideoSelector({
 
       const response = await fetch(countQuery, {
         headers: {
-          Authorization: "Bearer WeInfl3nc3withAI",
+          Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
       });
@@ -417,11 +375,14 @@ export default function VideoSelector({
 
         // Set current path for future queries
         setCurrentPath(folderPath);
+      } else {
+        console.error("Failed to fetch video count:", response.status, response.statusText);
+        setTotalVideosCount(0);
+        setCurrentPath(folderPath);
       }
     } catch (error) {
       console.error("Error fetching video count:", error);
-      // Set demo count on error
-      setTotalVideosCount(10);
+      setTotalVideosCount(0);
       setCurrentPath(folderPath);
     } finally {
       setVideosLoading(false);
@@ -430,139 +391,23 @@ export default function VideoSelector({
 
   // Function to fetch videos with search, sort, and pagination
   const fetchVideosWithFilters = useCallback(async () => {
-    if (!userData.id) return;
+    if (!userData?.id) return;
 
     try {
       setVideosLoading(true);
 
-      // Demo mode - create sample videos
-      const isDemoMode = true; // Set to false for production
-      
-      if (isDemoMode) {
-        // Create demo videos with complete data structure
-        const demoVideos: VideoData[] = [
-          {
-            id: "demo-video-1",
-            task_id: "task-1",
-            video_id: "15240939-5d12-4332-8463-82995ed98658",
-            user_uuid: userData.id,
-            model: "Demo Model",
-            mode: "demo",
-            prompt: "A beautiful landscape video",
-            duration: 30,
-            start_image: "/images/video-player-placeholder.png",
-            start_image_url: "/images/video-player-placeholder.png",
-            negative_prompt: "",
-            status: "completed",
-            task_created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-            task_completed_at: new Date(Date.now() - 86400000 + 60000).toISOString(), // 1 minute after creation
-            lip_flag: false,
-            user_filename: "demo-video-1.mp4",
-            user_notes: "Demo video for testing",
-            user_tags: ["demo", "test", "landscape"],
-            rating: 5,
-            favorite: false,
-            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
-            video_path: currentPath || "",
-            video_name: "Demo Video 1"
-          },
-          {
-            id: "demo-video-2",
-            task_id: "task-2",
-            video_id: "15240939-5d12-4332-8463-82995ed98659",
-            user_uuid: userData.id,
-            model: "Demo Model 2",
-            mode: "demo",
-            prompt: "Another amazing video with lip sync",
-            duration: 45,
-            start_image: "/images/video-player-placeholder.png",
-            start_image_url: "/images/video-player-placeholder.png",
-            negative_prompt: "",
-            status: "completed",
-            task_created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-            task_completed_at: new Date(Date.now() - 172800000 + 90000).toISOString(), // 1.5 minutes after creation
-            lip_flag: true,
-            user_filename: "demo-video-2.mp4",
-            user_notes: "Demo video with lip sync",
-            user_tags: ["demo", "lip-sync", "portrait"],
-            rating: 4,
-            favorite: true,
-            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
-            video_path: currentPath || "",
-            video_name: "Demo Video 2"
-          },
-          {
-            id: "demo-video-3",
-            task_id: "task-3",
-            video_id: "15240939-5d12-4332-8463-82995ed98660",
-            user_uuid: userData.id,
-            model: "Demo Model 3",
-            mode: "demo",
-            prompt: "Creative abstract video",
-            duration: 60,
-            start_image: "/images/video-player-placeholder.png",
-            start_image_url: "/images/video-player-placeholder.png",
-            negative_prompt: "",
-            status: "completed",
-            task_created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-            task_completed_at: new Date(Date.now() - 259200000 + 120000).toISOString(), // 2 minutes after creation
-            lip_flag: false,
-            user_filename: "demo-video-3.mp4",
-            user_notes: "Creative abstract video for testing",
-            user_tags: ["demo", "abstract", "creative"],
-            rating: 3,
-            favorite: false,
-            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
-            video_path: currentPath || "",
-            video_name: "Demo Video 3"
-          },
-          {
-            id: "demo-video-4",
-            task_id: "task-4",
-            video_id: "15240939-5d12-4332-8463-82995ed98661",
-            user_uuid: userData.id,
-            model: "Demo Model 4",
-            mode: "demo",
-            prompt: "Professional business video",
-            duration: 25,
-            start_image: "/images/video-player-placeholder.png",
-            start_image_url: "/images/video-player-placeholder.png",
-            negative_prompt: "",
-            status: "completed",
-            task_created_at: new Date(Date.now() - 345600000).toISOString(), // 4 days ago
-            task_completed_at: new Date(Date.now() - 345600000 + 45000).toISOString(), // 45 seconds after creation
-            lip_flag: true,
-            user_filename: "demo-video-4.mp4",
-            user_notes: "Professional business video",
-            user_tags: ["demo", "business", "professional"],
-            rating: 5,
-            favorite: true,
-            video_url: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
-            video_path: currentPath || "",
-            video_name: "Demo Video 4"
-          }
-        ];
-        
-        // Apply search filter if needed
-        let filteredVideos = demoVideos;
-        if (searchTerm.trim()) {
-          filteredVideos = demoVideos.filter(video => 
-            video.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            video.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            video.user_filename?.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
-        
-        console.log("Demo videos loaded:", filteredVideos);
-        console.log("Demo video URLs:", filteredVideos.map(v => ({ id: v.id, url: v.video_url })));
-        setVideos(filteredVideos);
-        setTotalVideosCount(filteredVideos.length); // Update count to match filtered videos
+      // Get access token from sessionStorage
+      const accessToken = typeof window !== 'undefined' ? sessionStorage.getItem("access_token") : null;
+
+      if (!accessToken) {
+        console.error("No access token found");
+        toast.error("Authentication required. Please log in again.");
         setVideosLoading(false);
         return;
       }
 
       // Build the base query
-      let query = `${config.supabase_server_url}/video?user_uuid=eq.${userData.id}&status=eq.completed`;
+      let query = `${config.supabase_server_url}/video?user_uuid=eq.${userData?.id}&status=eq.completed`;
 
       // Add path filter
       if (currentPath === "") {
@@ -630,6 +475,7 @@ export default function VideoSelector({
       query += `&limit=${itemsPerPage}&offset=${offset}`;
 
       console.log("Fetch videos query:", query);
+      console.log("Using access token:", accessToken.substring(0, 20) + "...");
 
       const response = await fetch(query, {
         headers: {
@@ -641,24 +487,40 @@ export default function VideoSelector({
       if (response.ok) {
         const data = await response.json();
         console.log("Fetched videos with filters:", data);
+        console.log("Number of videos fetched:", data.length);
         console.log(
           "Video IDs:",
-          data.map((v) => ({
+          data.map((v: VideoData) => ({
             id: v.id,
             task_id: v.task_id,
             video_id: v.video_id,
+            video_url: v.video_url,
           }))
         );
-        setVideos(data);
+
+        // Process videos to ensure they have proper URLs
+        const processedVideos = data.map((video: VideoData) => ({
+          ...video,
+          video_url: video.video_url || getVideoUrl(video),
+        }));
+
+        setVideos(processedVideos);
+      } else {
+        console.error("Failed to fetch videos:", response.status, response.statusText);
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        toast.error(`Failed to load videos: ${response.status} ${response.statusText}`);
+        setVideos([]);
       }
     } catch (error) {
       console.error("Error fetching videos with filters:", error);
-      toast.error("Failed to load videos");
+      toast.error("Network error. Please check your connection and try again.");
+      setVideos([]);
     } finally {
       setVideosLoading(false);
     }
   }, [
-    userData.id,
+    userData?.id,
     currentPath,
     searchTerm,
     modelFilter,
@@ -672,7 +534,7 @@ export default function VideoSelector({
 
   // Fetch videos when filters change
   useEffect(() => {
-    if (open && userData.id) {
+    if (open && userData?.id) {
       // Add timeout to prevent endless loading
       const timeoutId = setTimeout(() => {
         fetchVideosWithFilters();
@@ -680,50 +542,43 @@ export default function VideoSelector({
 
       return () => clearTimeout(timeoutId);
     }
-  }, [fetchVideosWithFilters, open, userData.id]);
+  }, [fetchVideosWithFilters, open, userData?.id]);
 
-  // Initialize demo data when component opens
+  // Initialize component when it opens
   useEffect(() => {
-    if (open && userData.id) {
+    if (open && userData?.id) {
       console.log("Video selector opened, userData:", userData);
-      // Initialize with demo data immediately
-      const isDemoMode = true;
-      if (isDemoMode) {
-        console.log("Setting up demo mode");
-        setFoldersLoading(false);
-        setVideosLoading(false);
-        // Set initial demo video count (4 demo videos)
-        setTotalVideosCount(4);
-      }
+      // Reset states when component opens
+      setVideos([]);
+      setTotalVideosCount(0);
+      setCurrentPath("");
     }
-  }, [open, userData.id]);
+  }, [open, userData?.id]);
 
   // Fetch folder file count
   const fetchFolderFileCount = async (folderPath: string) => {
-    if (!userData.id) return;
+    if (!userData?.id) return;
 
     try {
       setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: true }));
 
-      // Demo mode - set demo file counts
-      const isDemoMode = true; // Set to false for production
-      
-      if (isDemoMode) {
-        // Set demo file count based on folder
-        const demoCount = Math.floor(Math.random() * 8) + 2; // Random count between 2-10
-        setFolderFileCounts((prev) => ({ ...prev, [folderPath]: demoCount }));
+      // Get access token from sessionStorage
+      const accessToken = typeof window !== 'undefined' ? sessionStorage.getItem("access_token") : null;
+
+      if (!accessToken) {
+        console.error("No access token found for folder file count fetch");
         setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: false }));
         return;
       }
 
       const response = await fetch(
-        `${config.supabase_server_url}/video?user_uuid=eq.${userData.id
+        `${config.supabase_server_url}/video?user_uuid=eq.${userData?.id
         }&status=eq.completed&video_path=eq.${encodeURIComponent(
           folderPath
         )}&select=count`,
         {
           headers: {
-            Authorization: "Bearer WeInfl3nc3withAI",
+            Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
         }
@@ -733,11 +588,13 @@ export default function VideoSelector({
         const data = await response.json();
         const count = data[0]?.count || 0;
         setFolderFileCounts((prev) => ({ ...prev, [folderPath]: count }));
+      } else {
+        console.error("Failed to fetch folder file count:", response.status, response.statusText);
+        setFolderFileCounts((prev) => ({ ...prev, [folderPath]: 0 }));
       }
     } catch (error) {
       console.error("Error fetching folder file count:", error);
-      // Set demo count on error
-      setFolderFileCounts((prev) => ({ ...prev, [folderPath]: 5 }));
+      setFolderFileCounts((prev) => ({ ...prev, [folderPath]: 0 }));
     } finally {
       setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: false }));
     }
@@ -789,14 +646,26 @@ export default function VideoSelector({
 
   // Handle video selection
   const handleVideoSelect = (video: VideoData) => {
+    console.log("Video selected from selector:", video);
+    
     // Ensure the video has the correct URL before passing it
+    const videoUrl = getVideoUrl(video);
     const videoWithUrl = {
       ...video,
-      video_url: getVideoUrl(video),
+      video_url: videoUrl,
     };
+    
+    console.log("Video URL constructed:", videoUrl);
+    console.log("Video data being passed to overlay panel:", videoWithUrl);
+    
     onVideoSelect(videoWithUrl);
     onOpenChange(false);
-    toast.success(`Selected: ${video.prompt.substring(0, 50)}...`);
+    
+    // Enhanced success message with video details
+    const videoName = video.user_filename || video.video_name || video.prompt.substring(0, 30);
+    toast.success(`Video "${videoName}" added to timeline`, {
+      description: `Duration: ${formatVideoDuration(video.duration || 0)} | Model: ${video.model}`,
+    });
   };
 
   // Pagination functions
@@ -820,7 +689,7 @@ export default function VideoSelector({
   // Video helper functions
   const getVideoUrl = (video: VideoData) => {
     let videoUrl = "";
-    
+
     // Use video_url if available, otherwise construct from video_path and video_name
     if (video.video_url) {
       videoUrl = video.video_url;
@@ -829,15 +698,17 @@ export default function VideoSelector({
         video.video_name && video.video_name.trim() !== ""
           ? video.video_name
           : video.video_id;
-      videoUrl = `${config.data_url}/${userData.id}/video/${video.video_path ? video.video_path + "/" : ""
+      videoUrl = `${config.data_url}/${userData?.id}/video/${video.video_path ? video.video_path + "/" : ""
         }${fileName}.mp4`;
     }
-    
-    // Use proxy for external URLs to avoid CORS issues
+
+    // Always use proxy for external URLs to avoid CORS issues
+    // This includes both direct video_url and constructed URLs from data_url
     if (videoUrl.startsWith('http')) {
       return `/api/video-proxy?url=${encodeURIComponent(videoUrl)}`;
     }
-    
+
+    // For local/relative URLs, return as-is
     return videoUrl;
   };
 
@@ -1094,7 +965,6 @@ export default function VideoSelector({
             </div>
 
             {/* Videos Grid */}
-            {console.log("Rendering videos grid - videosLoading:", videosLoading, "videos.length:", videos.length, "videos:", videos)}
             {videosLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {[...Array(itemsPerPage)].map((_, i) => (
@@ -1148,7 +1018,7 @@ export default function VideoSelector({
                             videoElement.pause();
                           }}
                         />
-                        
+
                         {/* Fallback image for when video fails to load */}
                         <img
                           src={video.start_image_url || "/images/video-player-placeholder.png"}
@@ -1209,8 +1079,8 @@ export default function VideoSelector({
                             <Badge
                               variant="outline"
                               className={`text-xs px-2 py-1 ${video.lip_flag
-                                  ? "border-green-300 text-green-700 dark:text-green-400 dark:border-green-600"
-                                  : "border-gray-300 text-gray-700 dark:text-gray-400 dark:border-gray-600"
+                                ? "border-green-300 text-green-700 dark:text-green-400 dark:border-green-600"
+                                : "border-gray-300 text-gray-700 dark:text-gray-400 dark:border-gray-600"
                                 }`}
                             >
                               {video.lip_flag ? "Lip Sync" : "Regular"}

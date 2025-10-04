@@ -58,6 +58,7 @@ export function NextSignInForm({ onToggleMode, onSuccess }: NextSignInFormProps)
 
     try {
       // Make API call to backend login endpoint
+      
       const response = await fetch(`${config.backend_url}/login`, {
         method: "POST",
         headers: {

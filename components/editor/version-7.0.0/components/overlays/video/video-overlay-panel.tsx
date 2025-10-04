@@ -82,7 +82,11 @@ export const VideoOverlayPanel: React.FC = () => {
 
   // Handle video selection from video selector
   const handleVideoSelect = (videoData: any) => {
-    console.log("Selected video data:", videoData);
+    console.log("Selected video data in overlay panel:", videoData);
+    
+    // Calculate duration in frames first (default to 200 frames if duration is not available)
+    const durationInSeconds = videoData.duration || 6.67; // Default to ~200 frames at 30fps
+    const durationInFrames = Math.round(durationInSeconds * 30);
     
     const { width, height } = getAspectRatioDimensions();
     const { from, row } = findNextAvailablePosition(
@@ -94,8 +98,9 @@ export const VideoOverlayPanel: React.FC = () => {
     // Build video URL with fallbacks
     let videoUrl = "";
     if (videoData.video_url) {
-      // Use proxy for external URLs to avoid CORS issues
-      if (videoData.video_url.startsWith('http')) {
+      // The video_url should already be processed by the video-selector
+      // But let's ensure it's properly formatted
+      if (videoData.video_url.startsWith('http') && !videoData.video_url.includes('/api/video-proxy')) {
         videoUrl = `/api/video-proxy?url=${encodeURIComponent(videoData.video_url)}`;
       } else {
         videoUrl = videoData.video_url;
@@ -117,10 +122,6 @@ export const VideoOverlayPanel: React.FC = () => {
     } else {
       thumbnailUrl = videoUrl; // Use video URL as thumbnail if no separate thumbnail
     }
-
-    // Calculate duration in frames (default to 200 frames if duration is not available)
-    const durationInSeconds = videoData.duration || 6.67; // Default to ~200 frames at 30fps
-    const durationInFrames = Math.round(durationInSeconds * 30);
     
     const newOverlay: Overlay = {
       left: 0,
@@ -145,9 +146,19 @@ export const VideoOverlayPanel: React.FC = () => {
       },
     };
 
-    console.log("Created overlay:", newOverlay);
+    console.log("Created overlay for timeline:", {
+      ...newOverlay,
+      videoUrl: videoUrl,
+      thumbnailUrl: thumbnailUrl,
+      durationInSeconds: durationInSeconds,
+      position: { from, row },
+      dimensions: { width, height }
+    });
+    
     addOverlay(newOverlay);
     setShowVideoSelector(false);
+    
+    console.log("Video overlay added to timeline successfully");
   };
 
   const handleAddClip = (video: PexelsVideo) => {
