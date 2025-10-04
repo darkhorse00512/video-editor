@@ -75,7 +75,7 @@ export const DEFAULT_OVERLAYS: Overlay[] = [
     isDragging: false,
     type: OverlayType.VIDEO,
     content: "/images/video-player-placeholder.png",
-    src: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
+    src: "/images/video-player-placeholder.png",
     videoStartTime: 0,
     styles: {
       opacity: 1,
@@ -244,7 +244,7 @@ export const DEFAULT_OVERLAYS: Overlay[] = [
     isDragging: false,
     type: OverlayType.VIDEO,
     content: "/images/video-player-placeholder.png",
-    src: "/api/video-proxy?url=" + encodeURIComponent("https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"),
+    src: "/images/video-player-placeholder.png",
     videoStartTime: 0,
     styles: {
       opacity: 1,

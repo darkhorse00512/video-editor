@@ -995,7 +995,9 @@ export default function VideoSelector({
                           preload="metadata"
                           muted
                           loop
-                          poster={video.start_image_url || "/images/video-player-placeholder.png"}
+                          {...(video.start_image_url && video.start_image_url.trim() !== "" 
+                            ? { poster: video.start_image_url } 
+                            : {})}
                           onLoadStart={() => console.log("Video loading started:", getVideoUrl(video))}
                           onLoadedMetadata={() => console.log("Video metadata loaded:", video.id)}
                           onError={(e) => {
@@ -1021,7 +1023,9 @@ export default function VideoSelector({
 
                         {/* Fallback image for when video fails to load */}
                         <img
-                          src={video.start_image_url || "/images/video-player-placeholder.png"}
+                          src={video.start_image_url && video.start_image_url.trim() !== "" 
+                            ? video.start_image_url 
+                            : "/images/video-player-placeholder.png"}
                           alt={video.prompt}
                           className="fallback-image w-full h-full object-cover hidden"
                           onError={(e) => {

@@ -49,12 +49,6 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'sample-videos.com',
-        port: '',
-        pathname: '/**',
-      },
     ],
   },
   async headers() {

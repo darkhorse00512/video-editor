@@ -26,11 +26,11 @@ export default function RootLayout({
         <ReduxProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
+            defaultTheme="dark"
             enableSystem
             disableTransitionOnChange
           >
-            <main className="bg-gray-900">
+            <main className="bg-background text-foreground">
               {children}
               <Toaster />
             </main>

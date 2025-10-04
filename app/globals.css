@@ -107,3 +107,21 @@ html, body {
 .font-bungee-inline {
   font-family: 'Bungee Inline', cursive;
 }
+
+/* AI Gradient classes for login buttons */
+.bg-ai-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.hover\:bg-ai-gradient-dark:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+}
+
+/* Dark theme specific gradients */
+.dark .bg-ai-gradient {
+  background: linear-gradient(135deg, #4c51bf 0%, #553c9a 100%);
+}
+
+.dark .hover\:bg-ai-gradient-dark:hover {
+  background: linear-gradient(135deg, #434190 0%, #4c1d95 100%);
+}

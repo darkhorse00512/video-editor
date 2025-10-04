@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
     // Validate that the URL is from an allowed domain
     const allowedDomains = [
       'images.nymia.ai',
-      'sample-videos.com',
       'commondatastorage.googleapis.com',
       'www.learningcontainer.com'
     ];

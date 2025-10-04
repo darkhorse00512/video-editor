@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, Image as ImageIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 
 import { useEditorContext } from "../../../contexts/editor-context";
 import { useTimelinePositioning } from "../../../hooks/use-timeline-positioning";
@@ -10,6 +12,8 @@ import { useTimeline } from "../../../contexts/timeline-context";
 import { ImageOverlay, Overlay, OverlayType } from "../../../types";
 import { ImageDetails } from "./image-details";
 import { usePexelsImages } from "../../../hooks/use-pexels-images";
+import ImageSelector from "./image-selector";
+import config from "@/config/config";
 
 /**
  * Interface representing an image from the Pexels API
@@ -35,7 +39,9 @@ interface PexelsImage {
  * - Edit mode: Shows image details editor when an existing image overlay is selected
  */
 export const ImageOverlayPanel: React.FC = () => {
+  const userData = useSelector((state: RootState) => state.user);
   const [searchQuery, setSearchQuery] = useState("");
+  const [imageSelectorOpen, setImageSelectorOpen] = useState(false);
   const { images, isLoading, fetchImages } = usePexelsImages();
   const {
     addOverlay,
@@ -125,10 +131,64 @@ export const ImageOverlayPanel: React.FC = () => {
     changeOverlay(updatedOverlay.id, updatedOverlay);
   };
 
+  /**
+   * Handles selecting an image from the library
+   * @param imageData - The selected image data from the library
+   * Creates a new overlay with the selected image
+   */
+  const handleLibraryImageSelect = (imageData: any) => {
+    const { width, height } = getAspectRatioDimensions();
+    const { from, row } = findNextAvailablePosition(
+      overlays,
+      visibleRows,
+      durationInFrames
+    );
+
+    const imageUrl = `${config.data_url}/${userData.user?.id}/${imageData.user_filename === "" ? "output" : "vault/" + imageData.user_filename}/${imageData.system_filename}`;
+
+    const newOverlay: Overlay = {
+      left: 0,
+      top: 0,
+      width,
+      height,
+      durationInFrames: 200,
+      from,
+      id: Date.now(),
+      rotation: 0,
+      row,
+      isDragging: false,
+      type: OverlayType.IMAGE,
+      src: imageUrl,
+      styles: {
+        objectFit: "cover",
+        animation: {
+          enter: "fadeIn",
+          exit: "fadeOut",
+        },
+      },
+    };
+
+    console.log("Adding library image overlay:", newOverlay);
+    addOverlay(newOverlay);
+  };
+
   return (
     <div className="flex flex-col gap-4 p-4 bg-white dark:bg-gray-900/50 h-full">
+      {/* Browse Image Library Button - Always visible */}
+      <div className="mb-4">
+        <Button
+          onClick={() => setImageSelectorOpen(true)}
+          variant="outline"
+          className="w-full bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+        >
+          <ImageIcon className="h-4 w-4 mr-2" />
+          Browse Image Library
+        </Button>
+      </div>
+
       {!localOverlay ? (
         <>
+
           <form onSubmit={handleSearch} className="flex gap-2">
             <Input
               placeholder="Search images..."
@@ -184,6 +244,16 @@ export const ImageOverlayPanel: React.FC = () => {
           setLocalOverlay={handleUpdateOverlay}
         />
       )}
+
+      {/* Image Selector Dialog */}
+      <ImageSelector
+        open={imageSelectorOpen}
+        onOpenChange={setImageSelectorOpen}
+        onImageSelect={handleLibraryImageSelect}
+        title="Select Image from Library"
+        description="Browse your image library and select an image to use"
+        showAddonImages={false}
+      />
     </div>
   );
 };

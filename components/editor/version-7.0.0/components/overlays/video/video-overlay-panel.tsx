@@ -109,8 +109,8 @@ export const VideoOverlayPanel: React.FC = () => {
       const originalUrl = `${config.data_url}/${videoData.user_uuid}/video/${videoData.video_id}.mp4`;
       videoUrl = `/api/video-proxy?url=${encodeURIComponent(originalUrl)}`;
     } else {
-      // Fallback to a CORS-friendly video URL
-      videoUrl = "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4";
+      // No valid video URL available
+      videoUrl = "/images/video-player-placeholder.png";
     }
 
     // Build thumbnail URL with fallbacks
@@ -249,49 +249,6 @@ export const VideoOverlayPanel: React.FC = () => {
             </Button>
           </div>
 
-          {/* Custom Video Button */}
-          <div className="mb-4">
-            <Button
-              onClick={() => {
-                const { width, height } = getAspectRatioDimensions();
-                const { from, row } = findNextAvailablePosition(
-                  overlays,
-                  visibleRows,
-                  durationInFrames
-                );
-
-                const customVideoOverlay: Overlay = {
-                  left: 0,
-                  top: 0,
-                  width,
-                  height,
-                  durationInFrames: 200,
-                  from,
-                  id: Date.now(),
-                  rotation: 0,
-                  row,
-                  isDragging: false,
-                  type: OverlayType.VIDEO,
-                  content: "/images/video-player-placeholder.png",
-                  src: "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4",
-                  videoStartTime: 0,
-                  styles: {
-                    opacity: 1,
-                    zIndex: 100,
-                    transform: "none",
-                    objectFit: "cover",
-                  },
-                };
-
-                addOverlay(customVideoOverlay);
-              }}
-              variant="outline"
-              className="w-full bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
-            >
-              <Film className="h-4 w-4 mr-2" />
-              Add Custom Video
-            </Button>
-          </div>
 
           <div className="columns-2 sm:columns-2 gap-3 space-y-3">
             {isLoading ? (
