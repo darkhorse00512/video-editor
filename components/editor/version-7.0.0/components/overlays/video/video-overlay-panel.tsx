@@ -109,8 +109,9 @@ export const VideoOverlayPanel: React.FC = () => {
       const originalUrl = `${config.data_url}/${videoData.user_uuid}/video/${videoData.video_id}.mp4`;
       videoUrl = `/api/video-proxy?url=${encodeURIComponent(originalUrl)}`;
     } else {
-      // No valid video URL available
-      videoUrl = "/images/video-player-placeholder.png";
+      // No valid video URL available - don't create overlay
+      console.error("No valid video URL available for video:", videoData);
+      return;
     }
 
     // Build thumbnail URL with fallbacks

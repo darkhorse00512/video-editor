@@ -123,6 +123,7 @@ export default function VideoSelector({
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [goToPageInput, setGoToPageInput] = useState("");
 
   // Extract folder name from full path
   const extractFolderName = (fullPath: string): string => {
@@ -686,6 +687,14 @@ export default function VideoSelector({
   const goToNextPage = () =>
     handlePageChange(Math.min(totalPages, currentPage + 1));
 
+  const handleGoToPage = () => {
+    const page = parseInt(goToPageInput);
+    if (page >= 1 && page <= totalPages) {
+      handlePageChange(page);
+      setGoToPageInput("");
+    }
+  };
+
   // Video helper functions
   const getVideoUrl = (video: VideoData) => {
     let videoUrl = "";
@@ -943,25 +952,6 @@ export default function VideoSelector({
               <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Videos ({totalVideosCount})
               </h3>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Show:</span>
-                <Select
-                  value={itemsPerPage.toString()}
-                  onValueChange={(value) =>
-                    handleItemsPerPageChange(parseInt(value))
-                  }
-                >
-                  <SelectTrigger className="w-20 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             {/* Videos Grid */}
@@ -1002,13 +992,7 @@ export default function VideoSelector({
                           onLoadedMetadata={() => console.log("Video metadata loaded:", video.id)}
                           onError={(e) => {
                             console.error("Video load error:", e, getVideoUrl(video));
-                            // Hide video and show fallback image
-                            const videoElement = e.target as HTMLVideoElement;
-                            videoElement.style.display = 'none';
-                            const fallbackImg = videoElement.parentElement?.querySelector('.fallback-image') as HTMLImageElement;
-                            if (fallbackImg) {
-                              fallbackImg.style.display = 'block';
-                            }
+                            // Just log the error, don't try to show fallback image
                           }}
                           onMouseEnter={(e) => {
                             const videoElement = e.target as HTMLVideoElement;
@@ -1018,19 +1002,6 @@ export default function VideoSelector({
                           onMouseLeave={(e) => {
                             const videoElement = e.target as HTMLVideoElement;
                             videoElement.pause();
-                          }}
-                        />
-
-                        {/* Fallback image for when video fails to load */}
-                        <img
-                          src={video.start_image_url && video.start_image_url.trim() !== "" 
-                            ? video.start_image_url 
-                            : "/images/video-player-placeholder.png"}
-                          alt={video.prompt}
-                          className="fallback-image w-full h-full object-cover hidden"
-                          onError={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            img.src = "/images/video-player-placeholder.png";
                           }}
                         />
 
@@ -1135,73 +1106,133 @@ export default function VideoSelector({
 
           {/* Pagination Controls */}
           {totalVideosCount > 0 && (
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, totalVideosCount)} of{" "}
-                {totalVideosCount} videos
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-6 border-t border-gray-200 dark:border-gray-700 mt-4">
+              {/* Left side: Items per page selector and page info */}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Items per page:
+                  </span>
+                  <Select
+                    value={itemsPerPage.toString()}
+                    onValueChange={(value) => {
+                      const newItemsPerPage = parseInt(value);
+                      setItemsPerPage(newItemsPerPage);
+                      setCurrentPage(1); // Reset to first page when changing items per page
+                    }}
+                  >
+                    <SelectTrigger className="w-20 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                      <SelectItem value="200">200</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalVideosCount)} of{" "}
+                  {totalVideosCount} videos
+                </div>
               </div>
 
+              {/* Pagination buttons */}
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={goToFirstPage}
                   disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm font-medium border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300"
                 >
                   First
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={goToPreviousPage}
                   disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm font-medium border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300"
                 >
                   Previous
                 </Button>
 
+                {/* Page numbers */}
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
+                    let pageNumber;
                     if (totalPages <= 5) {
-                      pageNum = i + 1;
+                      pageNumber = i + 1;
                     } else if (currentPage <= 3) {
-                      pageNum = i + 1;
+                      pageNumber = i + 1;
                     } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
+                      pageNumber = totalPages - 4 + i;
                     } else {
-                      pageNum = currentPage - 2 + i;
+                      pageNumber = currentPage - 2 + i;
                     }
 
                     return (
                       <Button
-                        key={pageNum}
+                        key={pageNumber}
                         variant={
-                          currentPage === pageNum ? "default" : "outline"
+                          currentPage === pageNumber ? "default" : "outline"
                         }
-                        size="sm"
-                        onClick={() => handlePageChange(pageNum)}
-                        className="w-8 h-8 p-0"
+                        onClick={() => handlePageChange(pageNumber)}
+                        className={`px-3 py-1 text-sm font-medium transition-all duration-300 ${
+                          currentPage === pageNumber
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }`}
                       >
-                        {pageNum}
+                        {pageNumber}
                       </Button>
                     );
                   })}
                 </div>
 
+                {/* Go to page input */}
+                <div className="flex items-center gap-2 ml-4">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Go to:
+                  </span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={goToPageInput}
+                    onChange={(e) => setGoToPageInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleGoToPage();
+                      }
+                    }}
+                    className="w-16 h-8 text-center text-sm"
+                    placeholder="Page"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGoToPage}
+                    className="h-8 px-2 text-sm"
+                  >
+                    Go
+                  </Button>
+                </div>
+
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={goToNextPage}
                   disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm font-medium border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300"
                 >
                   Next
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={goToLastPage}
                   disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm font-medium border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300"
                 >
                   Last
                 </Button>

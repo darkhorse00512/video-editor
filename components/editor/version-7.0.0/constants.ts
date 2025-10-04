@@ -74,8 +74,8 @@ export const DEFAULT_OVERLAYS: Overlay[] = [
     row: 3,
     isDragging: false,
     type: OverlayType.VIDEO,
-    content: "/images/video-player-placeholder.png",
-    src: "/images/video-player-placeholder.png",
+    content: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4MCIgaGVpZ2h0PSI3MjAiIHZpZXdCb3g9IjAgMCAxMjgwIDcyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik01NjAgMzIwSDcyMFY0MDBINjAwVjMyMFoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTU2MCAzMjBINzIwVjQwMEg2MDBWMzIwWiIgZmlsbD0iIzZCNzI4MCIvPgo8L3N2Zz4K",
+    src: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4MCIgaGVpZ2h0PSI3MjAiIHZpZXdCb3g9IjAgMCAxMjgwIDcyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik01NjAgMzIwSDcyMFY0MDBINjAwVjMyMFoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTU2MCAzMjBINzIwVjQwMEg2MDBWMzIwWiIgZmlsbD0iIzZCNzI4MCIvPgo8L3N2Zz4K",
     videoStartTime: 0,
     styles: {
       opacity: 1,
@@ -243,8 +243,8 @@ export const DEFAULT_OVERLAYS: Overlay[] = [
     row: 3,
     isDragging: false,
     type: OverlayType.VIDEO,
-    content: "/images/video-player-placeholder.png",
-    src: "/images/video-player-placeholder.png",
+    content: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4MCIgaGVpZ2h0PSI3MjAiIHZpZXdCb3g9IjAgMCAxMjgwIDcyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik01NjAgMzIwSDcyMFY0MDBINjAwVjMyMFoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTU2MCAzMjBINzIwVjQwMEg2MDBWMzIwWiIgZmlsbD0iIzZCNzI4MCIvPgo8L3N2Zz4K",
+    src: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4MCIgaGVpZ2h0PSI3MjAiIHZpZXdCb3g9IjAgMCAxMjgwIDcyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik01NjAgMzIwSDcyMFY0MDBINjAwVjMyMFoiIGZpbGw9IiM5Q0EzQUYiLz4KPHBhdGggZD0iTTU2MCAzMjBINzIwVjQwMEg2MDBWMzIwWiIgZmlsbD0iIzZCNzI4MCIvPgo8L3N2Zz4K",
     videoStartTime: 0,
     styles: {
       opacity: 1,
