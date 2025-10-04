@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Music } from "lucide-react";
 import { LocalSound, OverlayType, SoundOverlay } from "../../../types";
 import { useState, useEffect, useRef } from "react";
 
@@ -9,6 +9,8 @@ import { useTimelinePositioning } from "../../../hooks/use-timeline-positioning"
 import { useEditorContext } from "../../../contexts/editor-context";
 import { useTimeline } from "../../../contexts/timeline-context";
 import { SoundDetails } from "./sound-details";
+import AudioSelector from "./audio-selector";
+import config from "@/config/config";
 
 /**
  * SoundsPanel Component
@@ -28,6 +30,7 @@ import { SoundDetails } from "./sound-details";
 const SoundsPanel: React.FC = () => {
   const [playingTrack, setPlayingTrack] = useState<string | null>(null);
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+  const [audioSelectorOpen, setAudioSelectorOpen] = useState(false);
   const {
     addOverlay,
     overlays,
@@ -140,6 +143,48 @@ const SoundsPanel: React.FC = () => {
   };
 
   /**
+   * Handles audio selection from the audio library
+   * Creates a sound overlay from the selected audio data
+   *
+   * @param {any} audioData - The selected audio data from the library
+   */
+  const handleLibraryAudioSelect = (audioData: any) => {
+    // Find the next available position on the timeline
+    const { from, row } = findNextAvailablePosition(
+      overlays,
+      visibleRows,
+      durationInFrames
+    );
+
+    // Build audio URL
+    const audioUrl = `${config.data_url}/${audioData.audio_path}`;
+
+    // Create the sound overlay configuration
+    const newSoundOverlay: SoundOverlay = {
+      id: Date.now(),
+      type: OverlayType.SOUND,
+      content: audioData.prompt || audioData.filename,
+      src: audioUrl,
+      from,
+      row,
+      // Layout properties
+      left: 0,
+      top: 0,
+      width: 1920,
+      height: 100,
+      rotation: 0,
+      isDragging: false,
+      durationInFrames: 200, // Default duration, could be calculated from audio length
+      styles: {
+        opacity: 1,
+      },
+    };
+
+    console.log("Adding library audio overlay:", newSoundOverlay);
+    addOverlay(newSoundOverlay);
+  };
+
+  /**
    * Renders an individual sound card with play controls and metadata
    * Clicking the card adds the sound to the timeline
    * Clicking the play button toggles sound preview
@@ -185,13 +230,37 @@ const SoundsPanel: React.FC = () => {
   return (
     <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-900/40 h-full">
       {!localOverlay ? (
-        localSounds.map(renderSoundCard)
+        <>
+          {/* Audio Library Button */}
+          <div className="mb-4">
+            <Button
+              onClick={() => setAudioSelectorOpen(true)}
+              variant="outline"
+              className="w-full bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40"
+            >
+              <Music className="h-4 w-4 mr-2" />
+              Browse Audio Library
+            </Button>
+          </div>
+
+          {/* Local Sounds */}
+          {localSounds.map(renderSoundCard)}
+        </>
       ) : (
         <SoundDetails
           localOverlay={localOverlay}
           setLocalOverlay={handleUpdateOverlay}
         />
       )}
+
+      {/* Audio Selector Dialog */}
+      <AudioSelector
+        open={audioSelectorOpen}
+        onOpenChange={setAudioSelectorOpen}
+        onAudioSelect={handleLibraryAudioSelect}
+        title="Select Audio from Library"
+        description="Browse your audio library and select an audio file to use"
+      />
     </div>
   );
 };
