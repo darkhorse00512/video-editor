@@ -174,21 +174,8 @@ export const ImageOverlayPanel: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4 p-4 bg-white dark:bg-gray-900/50 h-full">
-      {/* Browse Image Library Button - Always visible */}
-      <div className="mb-4">
-        <Button
-          onClick={() => setImageSelectorOpen(true)}
-          variant="outline"
-          className="w-full bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
-        >
-          <ImageIcon className="h-4 w-4 mr-2" />
-          Browse Image Library
-        </Button>
-      </div>
-
       {!localOverlay ? (
         <>
-
           <form onSubmit={handleSearch} className="flex gap-2">
             <Input
               placeholder="Search images..."
@@ -207,6 +194,18 @@ export const ImageOverlayPanel: React.FC = () => {
               <Search className="h-4 w-4" />
             </Button>
           </form>
+
+          {/* Image Library Button */}
+          <div className="mb-4">
+            <Button
+              onClick={() => setImageSelectorOpen(true)}
+              variant="outline"
+              className="w-full bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+            >
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Browse Image Library
+            </Button>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             {isLoading ? (
