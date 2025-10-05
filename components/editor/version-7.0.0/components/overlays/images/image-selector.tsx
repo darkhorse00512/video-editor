@@ -49,7 +49,7 @@ interface FileData {
   StorageClass: string;
 }
 
-// Interface for generated image data from database (matching working VaultSelector)
+// Interface for generated image data from database
 interface GeneratedImageData {
   id: string;
   task_id: string;
@@ -94,28 +94,30 @@ interface FolderStructure {
   isFolder: boolean;
 }
 
-interface ImageSelectorProps {
+interface VaultSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImageSelect: (image: GeneratedImageData) => void;
   title?: string;
   description?: string;
-  showAddonImages?: boolean;
+  showAddonImages?: boolean; // Whether to show the Addon Images folder
 }
 
-export default function ImageSelector({
+export default function VaultSelector({
   open,
   onOpenChange,
   onImageSelect,
   title = "Select Image from Library",
   description = "Browse your library and select an image to use",
-  showAddonImages = false,
-}: ImageSelectorProps) {
+  showAddonImages = false, // Default to false - only show on composer page
+}: VaultSelectorProps) {
   const userData = useSelector((state: RootState) => state.user);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [generatedImages, setGeneratedImages] = useState<GeneratedImageData[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImageData[]>(
+    []
+  );
   const [filesLoading, setFilesLoading] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -165,7 +167,7 @@ export default function ImageSelector({
     [key: string]: boolean;
   }>({});
 
-  // Professional data fetching with proper user_uuid filtering, search, and pagination (matching VaultSelector)
+  // Professional data fetching with proper user_uuid filtering, search, and pagination
   const fetchVaultDataWithFilters = useCallback(async () => {
     if (!userData.user?.id) return;
 
@@ -191,12 +193,10 @@ export default function ImageSelector({
         queryParams.append("user_filename", "eq." + currentPath);
       }
 
-      // Search filter - combine with existing or condition
+      // Search filter
       if (searchTerm.trim()) {
-        // If we already have an or condition, we need to combine them
         const existingOr = queryParams.get("or");
         if (existingOr) {
-          // Combine the existing or condition with the search condition
           queryParams.set("or", `(${existingOr},system_filename.ilike.*${searchTerm}*,user_filename.ilike.*${searchTerm}*,user_notes.ilike.*${searchTerm}*,user_tags.cs.{${searchTerm}})`);
         } else {
           queryParams.append("or", `(system_filename.ilike.*${searchTerm}*,user_filename.ilike.*${searchTerm}*,user_notes.ilike.*${searchTerm}*,user_tags.cs.{${searchTerm}})`);
@@ -229,7 +229,6 @@ export default function ImageSelector({
         queryParams.append("user_notes", "not.is.null");
         queryParams.append("user_notes", "neq.");
       } else if (selectedFilters.withNotes === false) {
-        // Combine with existing or condition
         const existingOr = queryParams.get("or");
         if (existingOr) {
           queryParams.set("or", `(${existingOr},user_notes.is.null,user_notes.eq.)`);
@@ -266,8 +265,6 @@ export default function ImageSelector({
       queryParams.append("limit", itemsPerPage.toString());
       queryParams.append("offset", offset.toString());
 
-      console.log("Fetching images with query:", `${config.supabase_server_url}/generated_images?${queryParams.toString()}`);
-
       // Fetch data from database with all filters
       const response = await fetch(
         `${config.supabase_server_url}/generated_images?${queryParams.toString()}`,
@@ -279,35 +276,24 @@ export default function ImageSelector({
         }
       );
 
-      console.log("Response:", response);
-
       if (!response.ok) {
-        console.error("Failed to fetch images:", response.status, response.statusText);
         throw new Error("Failed to fetch library data");
       }
 
       const data: GeneratedImageData[] = await response.json();
 
-      console.log("Data:", data);
-
       // Get total count for pagination
       const countParams = new URLSearchParams();
       countParams.append("user_uuid", "eq." + userData.user.id);
-
-      // Generation status filter for count query - only show completed images
       countParams.append("generation_status", "eq.completed");
 
-      // Current path filter for count query
       if (currentPath === "") {
-        // Root folder - show files with empty user_filename or null
         countParams.append("or", "(user_filename.is.null,user_filename.eq.)");
       } else {
-        // Specific folder - show files with matching user_filename
         countParams.append("user_filename", "eq." + currentPath);
       }
 
       if (searchTerm.trim()) {
-        // Combine with existing or condition
         const existingOr = countParams.get("or");
         if (existingOr) {
           countParams.set("or", `(${existingOr},system_filename.ilike.*${searchTerm}*,user_filename.ilike.*${searchTerm}*,user_notes.ilike.*${searchTerm}*,user_tags.cs.{${searchTerm}})`);
@@ -338,7 +324,6 @@ export default function ImageSelector({
         countParams.append("user_notes", "not.is.null");
         countParams.append("user_notes", "neq.");
       } else if (selectedFilters.withNotes === false) {
-        // Combine with existing or condition
         const existingOr = countParams.get("or");
         if (existingOr) {
           countParams.set("or", `(${existingOr},user_notes.is.null,user_notes.eq.)`);
@@ -406,14 +391,457 @@ export default function ImageSelector({
     setCurrentPage(1);
   }, [searchTerm, selectedFilters, sortBy, sortOrder]);
 
+  // Extract folder name from full path
+  const extractFolderName = (fullPath: string): string => {
+    // Remove the user ID and "vault/" prefix
+    const pathWithoutPrefix = fullPath.replace(/^[^\/]+\/vault\//, "");
+    return pathWithoutPrefix;
+  };
+
+  const encodeName = (name: string): string => {
+    return name.replace(/\s/g, "_space_");
+  };
+
+  // Decode folder/file name from URL (replace %20 with spaces)
+  const decodeName = (name: string): string => {
+    return name.replace(/_space_/g, " ");
+  };
+
+  // Build folder structure from raw folder data
+  const buildFolderStructure = (
+    folderData: FolderData[]
+  ): FolderStructure[] => {
+    const structure: FolderStructure[] = [];
+    const pathMap = new Map<string, FolderStructure>();
+
+    folderData.forEach((folder) => {
+      // Extract the folder path from the key
+      const folderPath = extractFolderName(folder.Key);
+
+      if (!folderPath) {
+        return;
+      }
+
+      const pathParts = folderPath.split("/").filter((part) => part.length > 0);
+
+      let currentPath = "";
+
+      pathParts.forEach((part, index) => {
+        const parentPath = currentPath;
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+
+        if (!pathMap.has(currentPath)) {
+          const folderNode: FolderStructure = {
+            name: part,
+            path: currentPath,
+            children: [],
+            isFolder: true,
+          };
+
+          pathMap.set(currentPath, folderNode);
+
+          if (parentPath && pathMap.has(parentPath)) {
+            pathMap.get(parentPath)!.children.push(folderNode);
+          } else if (!parentPath) {
+            structure.push(folderNode);
+          }
+        }
+      });
+    });
+
+    return structure;
+  };
+
+  const navigateToFolder = (folderPath: string) => {
+    if (folderPath === "addon-images") {
+      setIsInAddonImages(true);
+      setCurrentPath("");
+      setAddonCurrentPath("");
+      fetchAddonImages();
+      fetchAddonFolders();
+    } else {
+      setIsInAddonImages(false);
+      setCurrentPath(folderPath);
+    }
+  };
+
+  // Fetch addon images
+  const fetchAddonImages = async () => {
+    try {
+      setAddonImagesLoading(true);
+      const folderPath = addonCurrentPath
+        ? `addon/${addonCurrentPath}`
+        : "addon";
+      const response = await fetch(`${config.backend_url}/getfilenames`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer WeInfl3nc3withAI",
+        },
+        body: JSON.stringify({
+          user: "wizard",
+          folder: folderPath,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch addon images");
+      }
+
+      const data = await response.json();
+      setAddonImages(data);
+    } catch (error) {
+      console.error("Error fetching addon images:", error);
+      setAddonImages([]);
+    } finally {
+      setAddonImagesLoading(false);
+    }
+  };
+
+  // Fetch addon folders
+  const fetchAddonFolders = async () => {
+    try {
+      setAddonFoldersLoading(true);
+      const folderPath = addonCurrentPath
+        ? `addon/${addonCurrentPath}`
+        : "addon";
+      const response = await fetch(`${config.backend_url}/getfoldernames`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer WeInfl3nc3withAI",
+        },
+        body: JSON.stringify({
+          user: "wizard",
+          folder: folderPath,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch addon folders");
+      }
+
+      const data = await response.json();
+      setAddonFolders(data);
+    } catch (error) {
+      console.error("Error fetching addon folders:", error);
+      setAddonFolders([]);
+    } finally {
+      setAddonFoldersLoading(false);
+    }
+  };
+
+  const navigateToParent = () => {
+    if (isInAddonImages) {
+      if (addonCurrentPath) {
+        const pathParts = addonCurrentPath.split("/");
+        pathParts.pop();
+        const parentPath = pathParts.join("/");
+        setAddonCurrentPath(parentPath);
+      } else {
+        setIsInAddonImages(false);
+        setCurrentPath("");
+        setAddonImages([]);
+        setAddonFolders([]);
+        setAddonCurrentPath("");
+      }
+    } else {
+      const pathParts = currentPath.split("/");
+      pathParts.pop();
+      setCurrentPath(pathParts.join("/"));
+    }
+  };
+
+  const navigateToHome = () => {
+    setIsInAddonImages(false);
+    setCurrentPath("");
+    setAddonImages([]);
+    setAddonFolders([]);
+    setAddonCurrentPath("");
+  };
+
+  const getBreadcrumbItems = (): Array<{ name: string; path: string }> => {
+    if (isInAddonImages) {
+      const breadcrumbs: Array<{ name: string; path: string }> = [{ name: "Addon Images", path: "addon-images" }];
+
+      if (addonCurrentPath) {
+        const pathParts = addonCurrentPath.split("/");
+        let currentPathBuilt = "";
+
+        pathParts.forEach((part) => {
+          currentPathBuilt = currentPathBuilt
+            ? `${currentPathBuilt}/${part}`
+            : part;
+          breadcrumbs.push({
+            name: part,
+            path: `addon-images/${currentPathBuilt}`,
+          });
+        });
+      }
+
+      return breadcrumbs;
+    }
+
+    if (!currentPath) return [];
+
+    const pathParts = currentPath.split("/");
+    const breadcrumbs: Array<{ name: string; path: string }> = [];
+    let currentPathBuilt = "";
+
+    pathParts.forEach((part, index) => {
+      currentPathBuilt = currentPathBuilt
+        ? `${currentPathBuilt}/${part}`
+        : part;
+      breadcrumbs.push({
+        name: part,
+        path: currentPathBuilt,
+      });
+    });
+
+    return breadcrumbs;
+  };
+
+  // Navigate to addon folder
+  const navigateToAddonFolder = (folderPath: string) => {
+    setAddonCurrentPath(folderPath);
+  };
+
+  // Extract folder name from addon folder path
+  const extractAddonFolderName = (fullPath: string | undefined): string => {
+    if (!fullPath) {
+      return "";
+    }
+
+    // Remove the "wizard/addon/" prefix and any trailing slashes
+    let pathWithoutPrefix = fullPath.replace(/^wizard\/addon\//, "");
+    pathWithoutPrefix = pathWithoutPrefix.replace(/\/$/, "");
+    return pathWithoutPrefix;
+  };
+
+  // Get current addon folders to display
+  const getCurrentAddonFolders = () => {
+    if (!addonFolders || addonFolders.length === 0) {
+      return [];
+    }
+
+    // Extract folder names and filter for immediate children
+    const folderPaths = addonFolders
+      .filter((folder) => folder && folder.Key)
+      .map((folder) => extractAddonFolderName(folder.Key))
+      .filter((path) => path && path.trim() !== "");
+
+    // If we're in root addon path, show only top-level folders
+    if (!addonCurrentPath) {
+      const topLevelFolders = folderPaths
+        .filter((path) => !path.includes("/"))
+        .map((path) => ({
+          name: path,
+          path: path,
+        }));
+
+      const uniqueFolders = Array.from(
+        new Map(topLevelFolders.map((f) => [f.path, f])).values()
+      );
+
+      return uniqueFolders;
+    }
+
+    // If we're in a subfolder, show immediate children
+    const childFolders = folderPaths
+      .filter((path) => {
+        if (!path.startsWith(addonCurrentPath + "/")) {
+          return false;
+        }
+
+        const relativePath = path.substring(addonCurrentPath.length + 1);
+        return !relativePath.includes("/");
+      })
+      .map((path) => {
+        const relativePath = path.substring(addonCurrentPath.length + 1);
+        return {
+          name: relativePath,
+          path: path,
+        };
+      });
+
+    const uniqueFolders = Array.from(
+      new Map(childFolders.map((f) => [f.path, f])).values()
+    );
+
+    return uniqueFolders;
+  };
+
+  // Refetch addon data when path changes
+  useEffect(() => {
+    if (isInAddonImages) {
+      fetchAddonImages();
+      fetchAddonFolders();
+    }
+  }, [addonCurrentPath]);
+
+  const getCurrentPathFolders = (): FolderStructure[] => {
+    if (!currentPath) return folderStructure;
+
+    const findFolder = (
+      folders: FolderStructure[],
+      path: string
+    ): FolderStructure | null => {
+      for (const folder of folders) {
+        if (folder.path === path) return folder;
+        const found = findFolder(folder.children, path);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const currentFolder = findFolder(folderStructure, currentPath);
+    return currentFolder ? currentFolder.children : [];
+  };
+
+  const getCurrentPathRawFolders = (): FolderData[] => {
+    return folders.filter((folder) => {
+      const folderPath = extractFolderName(folder.Key);
+      if (!folderPath) return false;
+
+      if (!currentPath) {
+        // Root level - show folders that don't have subfolders
+        return !folderPath.includes("/");
+      } else {
+        // Show immediate children of current path
+        const pathParts = folderPath.split("/");
+        return (
+          pathParts.length > 0 &&
+          pathParts[0] === currentPath.split("/")[0] &&
+          folderPath.startsWith(currentPath + "/") &&
+          folderPath.split("/").length === currentPath.split("/").length + 1
+        );
+      }
+    });
+  };
+
+  const fetchFolderFileCount = async (folderPath: string) => {
+    if (!userData.user?.id) return;
+
+    try {
+      setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: true }));
+
+      const response = await fetch(
+        `${config.supabase_server_url}/generated_images?user_uuid=eq.${userData.user.id}&generation_status=eq.completed&user_filename=eq.${folderPath}&select=count`,
+        {
+          headers: {
+            Authorization: "Bearer WeInfl3nc3withAI",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const count = data[0]?.count || 0;
+        setFolderFileCounts((prev) => ({ ...prev, [folderPath]: count }));
+      }
+    } catch (error) {
+      console.error(
+        `Error fetching file count for folder ${folderPath}:`,
+        error
+      );
+    } finally {
+      setLoadingFileCounts((prev) => ({ ...prev, [folderPath]: false }));
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedFilters({
+      fileTypes: [],
+      favorites: null,
+      ratingRange: { min: 0, max: 5 },
+      withNotes: null,
+      withTags: null,
+      selectedTags: [],
+    });
+    setSortBy("newest");
+    setSortOrder("desc");
+  };
+
+  // Fetch folders
+  useEffect(() => {
+    const fetchFolders = async () => {
+      try {
+        setFoldersLoading(true);
+
+        const response = await fetch(`${config.backend_url}/getfoldernames`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer WeInfl3nc3withAI",
+          },
+          body: JSON.stringify({
+            user: userData.user?.id,
+            folder: "vault",
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch folders");
+        }
+
+        const data = await response.json();
+        console.log("Raw folders data from API:", data);
+        setFolders(data);
+
+        // Build folder structure
+        const structure = buildFolderStructure(data);
+        console.log("Built folder structure:", structure);
+        setFolderStructure(structure);
+
+        // If no structure was built, create a fallback from the raw data
+        if (structure.length === 0 && data.length > 0) {
+          console.log("No structure built, creating fallback folders");
+          const fallbackFolders = data.map((folder: FolderData) => ({
+            name:
+              folder.Key || extractFolderName(folder.Key) || "Unknown Folder",
+            path: folder.Key || extractFolderName(folder.Key) || "unknown",
+            children: [],
+            isFolder: true,
+          }));
+          console.log("Fallback folders:", fallbackFolders);
+          setFolderStructure(fallbackFolders);
+        }
+      } catch (error) {
+        console.error("Error fetching folders:", error);
+        setFolders([]);
+        setFolderStructure([]);
+      } finally {
+        setFoldersLoading(false);
+      }
+    };
+
+    if (open && userData.user?.id) {
+      fetchFolders();
+    }
+  }, [open, userData.user?.id]);
+
+  // Fetch file counts for folders
+  useEffect(() => {
+    const fetchAllFolderFileCounts = async () => {
+      const currentFolders = getCurrentPathFolders();
+
+      // Fetch file counts for each immediate children folder of current path
+      for (const folder of currentFolders) {
+        await fetchFolderFileCount(folder.path);
+      }
+    };
+
+    if (folderStructure.length > 0) {
+      fetchAllFolderFileCounts();
+    }
+  }, [folderStructure, userData.user?.id, currentPath]);
+
   const handleImageSelect = (image: GeneratedImageData) => {
     onImageSelect(image);
     onOpenChange(false);
     toast.success(`Selected: ${image.system_filename}`);
-  };
-
-  const getImageUrl = (image: GeneratedImageData) => {
-    return `${config.data_url}/${userData.user?.id}/${image.user_filename === "" ? "output" : "vault/" + image.user_filename}/${image.system_filename}`;
   };
 
   // Pagination functions
@@ -440,6 +868,10 @@ export default function ImageSelector({
     }
   };
 
+  const getImageUrl = (image: GeneratedImageData) => {
+    return `${config.data_url}/${userData.user?.id}/${image.user_filename === "" ? "output" : "vault/" + image.user_filename}/${image.system_filename}`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto overflow-x-hidden">
@@ -455,54 +887,539 @@ export default function ImageSelector({
 
         <div className="flex flex-col h-full space-y-4">
           {/* Professional Search and Filter Bar */}
-          <div className="flex items-center justify-between gap-4 mb-6">
-            {/* Search Bar */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search library by title, notes, or tags..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-background/50"
-              />
-            </div>
+          {!isInAddonImages && (
+            <div className="flex items-center justify-between gap-4 mb-6">
+              {/* Search Bar */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search library by title, notes, or tags..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-background/50"
+                />
+              </div>
 
-            {/* Sort Controls */}
-            <div className="flex items-center gap-2">
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="oldest">Oldest</SelectItem>
-                  <SelectItem value="rating">Rating</SelectItem>
-                  <SelectItem value="filename">Filename</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Sort Controls */}
+              <div className="flex items-center gap-2">
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest</SelectItem>
+                    <SelectItem value="oldest">Oldest</SelectItem>
+                    <SelectItem value="rating">Rating</SelectItem>
+                    <SelectItem value="filename">Filename</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setSortOrder(sortOrder === "desc" ? "asc" : "desc")
-                }
-              >
-                {sortOrder === "desc" ? (
-                  <SortDesc className="w-4 h-4" />
-                ) : (
-                  <SortAsc className="w-4 h-4" />
-                )}
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setSortOrder(sortOrder === "desc" ? "asc" : "desc")
+                  }
+                >
+                  {sortOrder === "desc" ? (
+                    <SortDesc className="w-4 h-4" />
+                  ) : (
+                    <SortAsc className="w-4 h-4" />
+                  )}
+                </Button>
+
+                {/* Filter Menu Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilterMenuOpen(!filterMenuOpen)}
+                  className={`${filterMenuOpen
+                      ? "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800"
+                      : ""
+                    }`}
+                >
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filters
+                  {(selectedFilters.fileTypes.length > 0 ||
+                    selectedFilters.favorites !== null ||
+                    selectedFilters.ratingRange.min > 0 ||
+                    selectedFilters.ratingRange.max < 5 ||
+                    selectedFilters.withNotes !== null ||
+                    selectedFilters.selectedTags.length > 0) && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-2 h-5 w-5 p-0 text-xs"
+                      >
+                        {[
+                          selectedFilters.fileTypes.length,
+                          selectedFilters.favorites !== null ? 1 : 0,
+                          selectedFilters.ratingRange.min > 0 ||
+                            selectedFilters.ratingRange.max < 5
+                            ? 1
+                            : 0,
+                          selectedFilters.withNotes !== null ? 1 : 0,
+                          selectedFilters.selectedTags.length,
+                        ].reduce((a, b) => a + b, 0)}
+                      </Badge>
+                    )}
+                </Button>
+
+                {/* Clear Filters */}
+                {(selectedFilters.fileTypes.length > 0 ||
+                  selectedFilters.favorites !== null ||
+                  selectedFilters.ratingRange.min > 0 ||
+                  selectedFilters.ratingRange.max < 5 ||
+                  selectedFilters.withNotes !== null ||
+                  selectedFilters.selectedTags.length > 0) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+              </div>
             </div>
+          )}
+
+          {/* Filter Menu */}
+          {!isInAddonImages && filterMenuOpen && (
+            <Card className="p-4 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* File Type Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">File Type</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["pic", "video"].map((type) => (
+                      <Button
+                        key={type}
+                        variant={
+                          selectedFilters.fileTypes.includes(type)
+                            ? "default"
+                            : "outline"
+                        }
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFilters((prev) => ({
+                            ...prev,
+                            fileTypes: prev.fileTypes.includes(type)
+                              ? prev.fileTypes.filter((t) => t !== type)
+                              : [...prev.fileTypes, type],
+                          }));
+                        }}
+                        className="text-xs"
+                      >
+                        {type === "pic" ? "Image" : "Video"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Favorite Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Favorite Status</Label>
+                  <Select
+                    value={
+                      selectedFilters.favorites === null
+                        ? "all"
+                        : selectedFilters.favorites.toString()
+                    }
+                    onValueChange={(value) => {
+                      setSelectedFilters((prev) => ({
+                        ...prev,
+                        favorites: value === "all" ? null : value === "true",
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Items</SelectItem>
+                      <SelectItem value="true">Favorites Only</SelectItem>
+                      <SelectItem value="false">Non-Favorites Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Rating Range Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Rating Range</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={selectedFilters.ratingRange.min}
+                      onChange={(e) => {
+                        setSelectedFilters((prev) => ({
+                          ...prev,
+                          ratingRange: {
+                            ...prev.ratingRange,
+                            min: parseInt(e.target.value) || 0,
+                          },
+                        }));
+                      }}
+                      className="w-16"
+                      placeholder="Min"
+                    />
+                    <span className="text-sm">to</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={selectedFilters.ratingRange.max}
+                      onChange={(e) => {
+                        setSelectedFilters((prev) => ({
+                          ...prev,
+                          ratingRange: {
+                            ...prev.ratingRange,
+                            max: parseInt(e.target.value) || 5,
+                          },
+                        }));
+                      }}
+                      className="w-16"
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Notes Status</Label>
+                  <Select
+                    value={
+                      selectedFilters.withNotes === null
+                        ? "all"
+                        : selectedFilters.withNotes.toString()
+                    }
+                    onValueChange={(value) => {
+                      setSelectedFilters((prev) => ({
+                        ...prev,
+                        withNotes: value === "all" ? null : value === "true",
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Items</SelectItem>
+                      <SelectItem value="true">With Notes</SelectItem>
+                      <SelectItem value="false">Without Notes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Breadcrumb Navigation */}
+          <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={navigateToHome}
+              className="h-8 px-2 text-sm font-medium"
+            >
+              <Home className="w-4 h-4 mr-1" />
+              Home
+            </Button>
+            {getBreadcrumbItems().map((item, index) => (
+              <div key={item.path} className="flex items-center gap-2">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigateToFolder(item.path)}
+                  className="h-8 px-2 text-sm font-medium"
+                >
+                  {decodeName(item.name)}
+                </Button>
+              </div>
+            ))}
           </div>
 
-          {/* Images Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Images</h3>
-              <Badge variant="secondary">{currentItems.length} images</Badge>
+          {/* Folders Section */}
+          {!isInAddonImages && !searchTerm && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Folders</h3>
+                <Badge variant="secondary">
+                  {getCurrentPathFolders().length} folders
+                </Badge>
+              </div>
+
+              {foldersLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                  <p className="text-muted-foreground mt-2">
+                    Loading folders...
+                  </p>
+                </div>
+              ) : getCurrentPathFolders().length > 0 ||
+                (!currentPath && (showAddonImages || !isInAddonImages)) ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+                  {/* Addon Images Special Folder */}
+                  {showAddonImages && !currentPath && !isInAddonImages && (
+                    <div
+                      className="group cursor-pointer"
+                      onDoubleClick={() => navigateToFolder("addon-images")}
+                    >
+                      <div className="flex flex-col items-center p-3 rounded-lg border-2 border-transparent transition-all duration-200 hover:border-green-300 hover:bg-green-50 dark:hover:bg-green-950/20">
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center mb-2 transition-transform duration-200 group-hover:scale-110">
+                          <Image className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-center text-gray-700 dark:text-gray-300 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                          Addon Images
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          Premium Content
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {addonImagesLoading ? (
+                            <div className="flex items-center gap-1">
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
+                              Loading...
+                            </div>
+                          ) : (
+                            `${addonImages.length} images`
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {getCurrentPathFolders().map((folder) => (
+                    <div
+                      key={folder.path}
+                      className="group cursor-pointer"
+                      onDoubleClick={() => navigateToFolder(folder.path)}
+                    >
+                      <div className="flex flex-col items-center p-3 rounded-lg border-2 border-transparent transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mb-2 transition-transform duration-200 group-hover:scale-110">
+                          <Folder className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-center text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {decodeName(folder.name)}
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          {folder.children.length} folders
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {loadingFileCounts[folder.path] ? (
+                            <div className="flex items-center gap-1">
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
+                              Loading...
+                            </div>
+                          ) : (
+                            `${folderFileCounts[folder.path] || 0} files`
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Folder className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    No folders in this location
+                  </p>
+                </div>
+              )}
             </div>
+          )}
+
+          {/* Addon Folders Section */}
+          {isInAddonImages && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Addon Folders</h3>
+                <Badge variant="secondary">
+                  {getCurrentAddonFolders().length} folders
+                </Badge>
+              </div>
+
+              {addonFoldersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+                  <p className="text-muted-foreground ml-2">
+                    Loading folders...
+                  </p>
+                </div>
+              ) : getCurrentAddonFolders().length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+                  {getCurrentAddonFolders().map((folder) => (
+                    <div
+                      key={folder.path}
+                      className="group cursor-pointer"
+                      onDoubleClick={() => navigateToAddonFolder(folder.path)}
+                    >
+                      <div className="flex flex-col items-center p-3 rounded-lg border-2 border-transparent transition-all duration-200 hover:border-green-300 hover:bg-green-50 dark:hover:bg-green-950/20">
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center mb-2 transition-transform duration-200 group-hover:scale-110">
+                          <Folder className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-center text-gray-700 dark:text-gray-300 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
+                          {decodeName(folder.name)}
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          Addon Folder
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* Addon Images Section */}
+          {isInAddonImages && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Addon Images</h3>
+                <Badge
+                  variant="secondary"
+                  className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                >
+                  {getCurrentAddonFolders().length} folders,{" "}
+                  {addonImages.length} images
+                </Badge>
+              </div>
+
+              {/* Addon Images Loading State */}
+              {addonImagesLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+                    <p className="text-muted-foreground">
+                      Loading addon images...
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Addon Images Grid */}
+              {!addonImagesLoading && addonImages.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {addonImages.map((image, index) => (
+                    <Card
+                      key={index}
+                      className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-green-200 dark:hover:border-green-800 group"
+                      onClick={() => {
+                        // Create a mock GeneratedImageData object for addon images
+                        const mockImage: GeneratedImageData = {
+                          id: `addon-${index}`,
+                          task_id: "addon",
+                          image_sequence_number: index + 1,
+                          system_filename:
+                            image.Key ||
+                            (typeof image === "string" ? image : "unknown"),
+                          user_filename: null,
+                          user_notes: null,
+                          user_tags: null,
+                          file_path: `${image.Key ||
+                            (typeof image === "string" ? image : "unknown")
+                            }`,
+                          file_size_bytes: 0,
+                          image_format: "jpg",
+                          seed: 0,
+                          guidance: 0,
+                          steps: 0,
+                          nsfw_strength: 0,
+                          lora_strength: 0,
+                          model_version: "addon",
+                          t5xxl_prompt: "",
+                          clip_l_prompt: "",
+                          negative_prompt: "",
+                          generation_status: "completed",
+                          generation_started_at: new Date().toISOString(),
+                          generation_completed_at: new Date().toISOString(),
+                          generation_time_seconds: 0,
+                          error_message: "",
+                          retry_count: 0,
+                          created_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                          actual_seed_used: 0,
+                          prompt_file_used: "",
+                          quality_setting: "addon",
+                          rating: 0,
+                          favorite: false,
+                          file_type: "pic",
+                        };
+                        handleImageSelect(mockImage);
+                      }}
+                    >
+                      <CardContent className="p-2">
+                        <div className="relative bg-gradient-to-br from-green-100 to-emerald-200 dark:from-green-700 dark:to-emerald-600 rounded-lg overflow-hidden mb-2">
+                          <img
+                            src={`${config.data_url}/${image.Key ||
+                              (typeof image === "string" ? image : "unknown")
+                              }`}
+                            alt={
+                              image.Key ||
+                              (typeof image === "string"
+                                ? image
+                                : "Unknown image")
+                            }
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/placeholder.svg";
+                            }}
+                          />
+                          <div className="absolute top-2 right-2">
+                            <span className="bg-green-500/90 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-lg backdrop-blur-sm">
+                              Addon
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium truncate">
+                            {image.Key
+                              ? image.Key.split("/").pop()
+                              : typeof image === "string"
+                                ? image
+                                : "Unknown"}
+                          </p>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <span className="text-green-600 dark:text-green-400 font-medium">
+                              Premium Content
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* Addon Images Empty State */}
+              {!addonImagesLoading && addonImages.length === 0 && (
+                <div className="text-center py-12">
+                  <Image className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No addon images available
+                  </h3>
+                  <p className="text-muted-foreground">
+                    There are no addon images available at the moment. Check
+                    back later for new premium content.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Regular Images Section */}
+          {!isInAddonImages && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Images</h3>
+                <Badge variant="secondary">{currentItems.length} images</Badge>
+              </div>
 
             {/* Loading State */}
             {isLoading && (
@@ -574,24 +1491,31 @@ export default function ImageSelector({
               </div>
             )}
 
-            {/* Empty State */}
-            {!isLoading && currentItems.length === 0 && (
-              <div className="text-center py-12">
-                <Image className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  No images found
-                </h3>
-                <p className="text-muted-foreground">
-                  {searchTerm
-                    ? "Try adjusting your search terms"
-                    : "This folder is empty. Upload some images to get started!"}
-                </p>
-              </div>
-            )}
-          </div>
+              {/* Empty State */}
+              {!isLoading && currentItems.length === 0 && (
+                <div className="text-center py-12">
+                  <Image className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No images found
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {searchTerm ||
+                      selectedFilters.fileTypes.length > 0 ||
+                      selectedFilters.favorites !== null ||
+                      selectedFilters.ratingRange.min > 0 ||
+                      selectedFilters.ratingRange.max < 5 ||
+                      selectedFilters.withNotes !== null ||
+                      selectedFilters.selectedTags.length > 0
+                      ? "Try adjusting your search or filters"
+                      : "This folder is empty. Upload some images to get started!"}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Pagination Controls */}
-          {totalItems > 0 && (
+          {!isInAddonImages && totalItems > 0 && (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-6 border-t border-gray-200 dark:border-gray-700 mt-4">
               {/* Left side: Items per page selector and page info */}
               <div className="flex flex-col sm:flex-row items-center gap-4">

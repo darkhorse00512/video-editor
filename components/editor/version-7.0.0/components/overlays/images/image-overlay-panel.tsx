@@ -12,7 +12,7 @@ import { useTimeline } from "../../../contexts/timeline-context";
 import { ImageOverlay, Overlay, OverlayType } from "../../../types";
 import { ImageDetails } from "./image-details";
 import { usePexelsImages } from "../../../hooks/use-pexels-images";
-import ImageSelector from "./image-selector";
+import VaultSelector from "./image-selector";
 import config from "@/config/config";
 
 /**
@@ -245,7 +245,7 @@ export const ImageOverlayPanel: React.FC = () => {
       )}
 
       {/* Image Selector Dialog */}
-      <ImageSelector
+      <VaultSelector
         open={imageSelectorOpen}
         onOpenChange={setImageSelectorOpen}
         onImageSelect={handleLibraryImageSelect}
