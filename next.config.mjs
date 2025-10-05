@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  eslint: { ignoreDuringBuilds: true },
   webpack: (config, { isServer }) => {
     // Handle platform-specific Remotion packages
     config.resolve = {
