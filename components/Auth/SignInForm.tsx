@@ -242,7 +242,7 @@ export function SignInForm({ onToggleMode }: SignInFormProps) {
       </Button>
 
       <div className="text-center text-sm">
-        <span className="text-muted-foreground">Don't have an account? </span>
+        <span className="text-muted-foreground">Don&apos;t have an account? </span>
         <Button
           variant="link"
           className="p-0 h-auto text-ai-purple-500 hover:text-ai-purple-600"
