@@ -58,6 +58,7 @@ interface AudioData {
   status: string;
   character_cost: number;
   audio_path: string; // folder path (without user/id prefix)
+  favorite?: boolean;
 }
 
 // Interface for folder structure
