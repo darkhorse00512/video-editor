@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import { MEDIA_FILTER_PRESETS } from "../../../templates/common/media-filter-presets";
 import { ClipOverlay, ImageOverlay } from "../../../types";
+import { getCachedVideoThumbnail } from "../../../utils/video-frame-extractor";
 
 interface MediaFilterPresetSelectorProps {
   localOverlay: ClipOverlay | ImageOverlay;
@@ -24,6 +25,31 @@ export const MediaFilterPresetSelector: React.FC<
   MediaFilterPresetSelectorProps
 > = ({ localOverlay, handleStyleChange }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [videoThumbnail, setVideoThumbnail] = useState<string>("");
+  const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(false);
+
+  // Extract video thumbnail when component mounts or video URL changes
+  useEffect(() => {
+    const extractThumbnail = async () => {
+      if (localOverlay.type === "video") {
+        const videoUrl = (localOverlay as ClipOverlay).content;
+        if (videoUrl && videoUrl !== videoThumbnail) {
+          setIsLoadingThumbnail(true);
+          try {
+            const thumbnail = await getCachedVideoThumbnail(videoUrl);
+            setVideoThumbnail(thumbnail);
+          } catch (error) {
+            console.error("Error extracting video thumbnail:", error);
+            setVideoThumbnail("");
+          } finally {
+            setIsLoadingThumbnail(false);
+          }
+        }
+      }
+    };
+
+    extractThumbnail();
+  }, [localOverlay, videoThumbnail]);
 
   // Determine which preset (if any) is currently active
   const getCurrentPresetId = (): string => {
@@ -86,10 +112,11 @@ export const MediaFilterPresetSelector: React.FC<
     }
   };
 
-  // Get the content to display in the preview (either video src or image src)
+  // Get the content to display in the preview (either video thumbnail or image src)
   const getMediaContent = () => {
     if (localOverlay.type === "video") {
-      return (localOverlay as ClipOverlay).content;
+      // For videos, use the extracted thumbnail if available, otherwise fall back to video URL
+      return videoThumbnail || (localOverlay as ClipOverlay).content;
     } else {
       return (localOverlay as ImageOverlay).src;
     }
@@ -130,13 +157,26 @@ export const MediaFilterPresetSelector: React.FC<
                 }`}
               >
                 {/* Media thumbnail with filter applied */}
-                <div className="relative h-12 w-full mb-1 rounded overflow-hidden">
-                  <img
-                    src={getMediaContent()}
-                    alt={`${preset.name} preview`}
-                    className="w-full h-full object-cover"
-                    style={{ filter: preset.filter }}
-                  />
+                <div className="relative h-12 w-full mb-1 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                  {localOverlay.type === "video" && isLoadingThumbnail ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <img
+                      src={getMediaContent()}
+                      alt={`${preset.name} preview`}
+                      className="w-full h-full object-cover"
+                      style={{ filter: preset.filter }}
+                      onError={(e) => {
+                        // Fallback for when thumbnail extraction fails
+                        const target = e.target as HTMLImageElement;
+                        if (localOverlay.type === "video") {
+                          target.src = (localOverlay as ClipOverlay).content;
+                        }
+                      }}
+                    />
+                  )}
                   {isActive && (
                     <div className="absolute top-1 right-1 bg-primary rounded-full p-0.5">
                       <Check className="h-3 w-3 text-background" />

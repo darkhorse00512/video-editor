@@ -98,10 +98,12 @@ export const VideoDetails: React.FC<VideoDetailsProps> = ({
     <div className="space-y-4">
       {/* Preview */}
       <div className="relative aspect-[16/7] w-full overflow-hidden rounded-sm border border-gray-200 dark:border-gray-700 bg-gray-100/40 dark:bg-black/40">
-        <img
+        <video
           src={localOverlay.content}
-          alt="Video preview"
           className="h-full w-full object-cover"
+          controls
+          muted
+          preload="metadata"
         />
       </div>
 

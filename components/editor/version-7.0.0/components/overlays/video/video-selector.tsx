@@ -994,9 +994,6 @@ export default function VideoSelector({
                           preload="metadata"
                           muted
                           loop
-                          {...(video.start_image_url && video.start_image_url.trim() !== "" 
-                            ? { poster: video.start_image_url } 
-                            : {})}
                           onLoadStart={() => console.log("Video loading started:", getVideoUrl(video))}
                           onLoadedMetadata={() => console.log("Video metadata loaded:", video.id)}
                           onError={(e) => {

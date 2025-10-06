@@ -1,6 +1,6 @@
 import React from "react";
 import { ClipOverlay } from "../../../types";
-import { MediaFilterPresetSelector } from "../common/media-filter-preset-selector";
+import { VideoFilterPresetSelector } from "./video-filter-preset-selector";
 import { MediaPaddingControls } from "../common/media-padding-controls";
 
 /**
@@ -60,8 +60,8 @@ export const VideoStylePanel: React.FC<VideoStylePanelProps> = ({
           </select>
         </div>
 
-        {/* Filter Preset Selector */}
-        <MediaFilterPresetSelector
+        {/* Video Filter Preset Selector */}
+        <VideoFilterPresetSelector
           localOverlay={localOverlay}
           handleStyleChange={handleStyleChange}
         />

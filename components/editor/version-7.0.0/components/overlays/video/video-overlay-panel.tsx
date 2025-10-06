@@ -267,10 +267,21 @@ export const VideoOverlayPanel: React.FC = () => {
                   onClick={() => handleAddClip(video)}
                 >
                   <div className="relative">
-                    <img
-                      src={video.image}
-                      alt={`Video thumbnail ${video.id}`}
+                    <video
+                      src={video.video_files[0]?.link || video.video_files.find(f => f.quality === 'hd')?.link || video.video_files[0]?.link}
                       className="w-full h-auto rounded-sm object-cover hover:opacity-60 transition-opacity duration-200"
+                      preload="metadata"
+                      muted
+                      loop
+                      onMouseEnter={(e) => {
+                        const videoElement = e.target as HTMLVideoElement;
+                        videoElement.currentTime = 0;
+                        videoElement.play().catch((err) => console.log("Play failed:", err));
+                      }}
+                      onMouseLeave={(e) => {
+                        const videoElement = e.target as HTMLVideoElement;
+                        videoElement.pause();
+                      }}
                     />
                     <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity duration-200" />
                   </div>
