@@ -102,7 +102,9 @@ To enable video rendering capabilities:
    - The deploy script will output the deployed site name (usually "sams-site")
    - Check AWS S3 console to confirm the site was uploaded
 
-For a detailed walkthrough of integrating Remotion with Next.js, check out [this comprehensive guide](https://www.reactvideoeditor.com/blog/video-rendering-with-remotion-and-nextjs).
+For a detailed walkthrough of integrating Remotion with Next.js, check out:
+- [This comprehensive guide](https://www.reactvideoeditor.com/blog/video-rendering-with-remotion-and-nextjs)
+- [Our Remotion Setup Guide](./REMOTION_SETUP_GUIDE.md) - Step-by-step instructions for this project
 
 ### Common Issues
 

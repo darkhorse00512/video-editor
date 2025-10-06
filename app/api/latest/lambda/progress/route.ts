@@ -23,18 +23,27 @@ export const POST = executeApi<ProgressResponse, typeof ProgressRequest>(
   ProgressRequest,
   async (req, body) => {
     console.log("Progress request", { body });
-    console.log("Bucket name", { bucketName: body.bucketName });
-    const renderProgress = await getRenderProgress({
+    console.log("Progress request details:", {
+      renderId: body.id,
       bucketName: body.bucketName,
       functionName: LAMBDA_FUNCTION_NAME,
-      region: REGION as AwsRegion,
-      renderId: body.id,
+      region: REGION
     });
+    
+    try {
+      const renderProgress = await getRenderProgress({
+        bucketName: body.bucketName,
+        functionName: LAMBDA_FUNCTION_NAME,
+        region: REGION as AwsRegion,
+        renderId: body.id,
+      });
+      
+      console.log("Render progress response:", renderProgress);
 
     if (renderProgress.fatalErrorEncountered) {
       return {
         type: "error",
-        message: renderProgress.errors[0].message,
+        message: renderProgress.errors?.[0]?.message ?? "Unknown error occurred during rendering",
       };
     }
 
@@ -46,9 +55,16 @@ export const POST = executeApi<ProgressResponse, typeof ProgressRequest>(
       };
     }
 
-    return {
-      type: "progress",
-      progress: Math.max(0.03, renderProgress.overallProgress),
-    };
+      return {
+        type: "progress",
+        progress: Math.max(0.03, renderProgress.overallProgress),
+      };
+    } catch (error) {
+      console.error("Error getting render progress:", error);
+      return {
+        type: "error",
+        message: `Failed to get render progress: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
+    }
   }
 );
