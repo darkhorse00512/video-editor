@@ -175,22 +175,12 @@ export const VideoFilterPresetSelector: React.FC<
                     </div>
                   )}
                 </div>
-                <span className="text-[10px] leading-tight text-center">
-                  {preset.name}
-                </span>
               </button>
             );
           })}
         </div>
       )}
 
-      {/* Show video info when thumbnail is loading */}
-      {localOverlay.type === "video" && isLoadingThumbnail && (
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
-          <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
-          Extracting video frame for filter preview...
-        </div>
-      )}
     </div>
   );
 };

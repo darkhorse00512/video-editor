@@ -113,6 +113,18 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     item.durationInFrames
   );
 
+  // Debug logging for waveform data
+  React.useEffect(() => {
+    if (item.type === OverlayType.SOUND) {
+      console.log("TimelineItem - Sound overlay:", {
+        id: item.id,
+        src: item.src,
+        waveformData: waveformData,
+        hasWaveformData: !!waveformData
+      });
+    }
+  }, [item.type, item.id, item.src, waveformData]);
+
   const isSelected = selectedItem?.id === item.id;
   const itemRef = useRef<HTMLDivElement>(null);
   const { setActivePanel, setIsOpen } = useSidebar();

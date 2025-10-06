@@ -183,9 +183,6 @@ export const MediaFilterPresetSelector: React.FC<
                     </div>
                   )}
                 </div>
-                <span className="text-[10px] leading-tight text-center">
-                  {preset.name}
-                </span>
               </button>
             );
           })}

@@ -156,8 +156,11 @@ const SoundsPanel: React.FC = () => {
       durationInFrames
     );
 
-    // Build audio URL
-    const audioUrl = `${config.data_url}/${audioData.audio_path}`;
+    // Use the audio_url that was constructed by the audio-selector
+    // This ensures we use the same URL construction method
+    const audioUrl = audioData.audio_url || audioData.src;
+
+    console.log("Using audio URL for waveform:", audioUrl);
 
     // Create the sound overlay configuration
     const newSoundOverlay: SoundOverlay = {

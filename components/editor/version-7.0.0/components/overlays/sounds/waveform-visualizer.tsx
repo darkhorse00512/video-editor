@@ -36,6 +36,13 @@ const WaveformVisualizer = memo(
     totalDuration,
     durationInFrames,
   }: WaveformVisualizerProps) => {
+    console.log("WaveformVisualizer rendering:", {
+      peaksCount: waveformData.peaks.length,
+      totalDuration,
+      durationInFrames,
+      firstFewPeaks: waveformData.peaks.slice(0, 5)
+    });
+    
     const itemWidth = (durationInFrames / totalDuration) * 100;
     const peaksToShow = Math.min(
       waveformData.peaks.length,

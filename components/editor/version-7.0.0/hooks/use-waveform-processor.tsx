@@ -46,16 +46,28 @@ export function useWaveformProcessor(
   const { numPoints = 400, fps = 30 } = options;
 
   useEffect(() => {
-    if (!src) return;
+    if (!src) {
+      console.log("useWaveformProcessor: No src provided");
+      return;
+    }
 
+    console.log("useWaveformProcessor: Starting waveform processing for:", src);
     let isActive = true;
 
     const processAudio = async () => {
       try {
+        console.log("Processing waveform for audio URL:", src);
         const response = await fetch(src);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+        }
+        
         const arrayBuffer = await response.arrayBuffer();
         const audioContext = new AudioContext();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        console.log("Audio buffer loaded successfully, duration:", audioBuffer.duration, "seconds");
 
         if (!isActive) return;
 
@@ -96,10 +108,19 @@ export function useWaveformProcessor(
           Math.min(peak / normalizeValue, 1)
         );
 
-        setWaveformData({
+        console.log("Waveform data generated successfully:", {
+          peaksCount: normalizedPeaks.length,
+          duration: audioBuffer.duration,
+          sampleRate: sampleRate
+        });
+        
+        const waveformResult = {
           peaks: normalizedPeaks,
           length: samplesForDuration,
-        });
+        };
+        
+        console.log("useWaveformProcessor: Setting waveform data:", waveformResult);
+        setWaveformData(waveformResult);
       } catch (error) {
         console.error("Error processing audio waveform:", error);
       }

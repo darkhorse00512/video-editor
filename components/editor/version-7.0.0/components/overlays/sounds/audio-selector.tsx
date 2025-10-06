@@ -121,10 +121,12 @@ export default function AudioSelector({
     [key: string]: boolean;
   }>({});
 
-  // Build public URL for an audio row
+  // Build public URL for an audio row using video-proxy to handle CORS
   const getPublicUrl = (row: AudioData): string => {
     const pathPart = row.audio_path ? `${row.audio_path}/` : "";
-    return `${config.data_url}/${userData?.id}/audio/${pathPart}${row.filename}`;
+    const directUrl = `${config.data_url}/${userData?.id}/audio/${pathPart}${row.filename}`;
+    // Use video-proxy API to handle CORS issues
+    return `/api/video-proxy?url=${encodeURIComponent(directUrl)}`;
   };
 
   // Fetch audios from Supabase REST with folder filtering
