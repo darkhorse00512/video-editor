@@ -46,11 +46,27 @@ export const TimelineKeyframes: React.FC<TimelineKeyframesProps> = ({
   onLoadingChange,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
+  
+  console.log("TimelineKeyframes: Rendering for overlay:", {
+    id: overlay.id,
+    type: overlay.type,
+    src: overlay.src,
+    content: overlay.content,
+    durationInFrames: overlay.durationInFrames
+  });
+  
   const { frames, previewFrames, isLoading } = useKeyframes({
     overlay,
     containerRef,
     currentFrame,
     zoomScale,
+  });
+  
+  console.log("TimelineKeyframes: useKeyframes result:", {
+    framesCount: frames.length,
+    previewFramesCount: previewFrames.length,
+    isLoading,
+    firstFrame: frames[0] ? frames[0].substring(0, 50) + "..." : "none"
   });
 
   React.useEffect(() => {

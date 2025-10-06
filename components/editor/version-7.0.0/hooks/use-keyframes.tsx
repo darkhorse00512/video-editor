@@ -3,7 +3,7 @@ import { ImageOverlay, OverlayType, ClipOverlay } from "../types";
 import { DISABLE_VIDEO_KEYFRAMES, FPS } from "../constants";
 import { useKeyframeContext } from "../contexts/keyframe-context";
 import { toAbsoluteUrl } from "../utils/url-helper";
-import { extractVideoFrame } from "../utils/video-frame-extractor";
+import { extractVideoFrame, testVideoUrlAccessibility } from "../utils/video-frame-extractor";
 
 interface UseKeyframesProps {
   overlay: ClipOverlay | ImageOverlay;
@@ -54,19 +54,32 @@ export const useKeyframes = ({
 
   // Memoize stable overlay values
   const overlayMeta = React.useMemo(
-    () => ({
-      id: overlay.id,
-      src: "src" in overlay ? overlay.src : undefined,
-      content: "content" in overlay ? overlay.content : undefined,
-      durationInFrames:
-        "durationInFrames" in overlay ? overlay.durationInFrames : undefined,
-      type: overlay.type,
-    }),
+    () => {
+      const src = "src" in overlay ? overlay.src : undefined;
+      const content = "content" in overlay ? overlay.content : undefined;
+      const durationInFrames = "durationInFrames" in overlay ? overlay.durationInFrames : undefined;
+      
+      console.log("useKeyframes: overlayMeta created:", {
+        id: overlay.id,
+        src,
+        content,
+        durationInFrames,
+        type: overlay.type
+      });
+      
+      return {
+        id: overlay.id,
+        src,
+        content,
+        durationInFrames,
+        type: overlay.type,
+      };
+    },
     [
       overlay.id,
-      "src" in overlay ? overlay.src : null,
-      "content" in overlay ? overlay.content : null,
-      "durationInFrames" in overlay ? overlay.durationInFrames : null,
+      overlay.src,
+      overlay.content,
+      overlay.durationInFrames,
       overlay.type,
     ]
   );
@@ -173,10 +186,10 @@ export const useKeyframes = ({
       setIsLoading(true);
       setFrames([]); // Reset frames
 
-      // Add error tracking with more lenient retry logic
-      let extractionErrors = 0;
-      const MAX_ERRORS = 5;
-      const MAX_RETRIES = 3;
+             // Add error tracking with more lenient retry logic
+             let extractionErrors = 0;
+             const MAX_ERRORS = 10; // Increased from 5 to 10
+             const MAX_RETRIES = 5; // Increased from 3 to 5
 
       // Check cache first but also verify cache integrity
       const overlayIdString = String(overlayMeta.id);
@@ -200,21 +213,37 @@ export const useKeyframes = ({
 
       // Process video source URL consistently with video-layer-content
       let processedVideoSrc = videoUrl;
+      console.log("useKeyframes: Original video URL:", videoUrl);
+      
       // If it's a relative URL and baseUrl is provided
-      if (videoUrl.startsWith("/") && baseUrl) {
+      if (videoUrl.startsWith("/") && baseUrl && !videoUrl.startsWith("/api/")) {
         processedVideoSrc = `${baseUrl}${videoUrl}`;
+        console.log("useKeyframes: Processed with baseUrl:", processedVideoSrc);
       }
-      // Otherwise use the toAbsoluteUrl helper for relative URLs
-      else if (videoUrl.startsWith("/")) {
+      // Otherwise use the toAbsoluteUrl helper for relative URLs (but not API routes)
+      else if (videoUrl.startsWith("/") && !videoUrl.startsWith("/api/")) {
         processedVideoSrc = toAbsoluteUrl(videoUrl);
+        console.log("useKeyframes: Processed with toAbsoluteUrl:", processedVideoSrc);
+      } else {
+        console.log("useKeyframes: Using original URL (API route or absolute):", processedVideoSrc);
       }
 
-      // Create a temporary video element to get dimensions
-      const tempVideo = document.createElement("video");
-      tempVideo.crossOrigin = "anonymous";
-      tempVideo.muted = true;
-      tempVideo.preload = "metadata";
-      tempVideo.src = processedVideoSrc;
+      // Test if the video URL is accessible
+      console.log("useKeyframes: Testing video URL accessibility");
+      const isAccessible = await testVideoUrlAccessibility(processedVideoSrc);
+      if (!isAccessible) {
+        console.error("useKeyframes: Video URL is not accessible:", processedVideoSrc);
+        return;
+      }
+      console.log("useKeyframes: Video URL is accessible, proceeding with extraction");
+
+             // Create a temporary video element to get dimensions
+             const tempVideo = document.createElement("video");
+             tempVideo.crossOrigin = "anonymous";
+             tempVideo.muted = true;
+             tempVideo.preload = "auto"; // Changed to auto for better loading
+             tempVideo.playsInline = true;
+             tempVideo.src = processedVideoSrc;
 
       const dimensions = await new Promise<{ width: number; height: number }>(
         (resolve, reject) => {
@@ -246,11 +275,11 @@ export const useKeyframes = ({
           tempVideo.addEventListener("loadedmetadata", onLoadedMetadata);
           tempVideo.addEventListener("error", onError);
 
-          // Add timeout for metadata loading
-          setTimeout(() => {
-            cleanup();
-            reject(new Error("Timeout while loading video metadata"));
-          }, 10000);
+                 // Extended timeout for metadata loading
+                 setTimeout(() => {
+                   cleanup();
+                   reject(new Error("Timeout while loading video metadata"));
+                 }, 30000);
         }
       );
 
@@ -258,64 +287,73 @@ export const useKeyframes = ({
         throw new Error("Could not get video dimensions");
       }
 
-      // Create new video and canvas elements for this extraction
-      const {
-        video: newVideo,
-        canvas,
-        context,
-      } = await createVideoAndCanvas(dimensions);
-      video = newVideo;
-      video.src = processedVideoSrc;
+             // Create new video and canvas elements for this extraction
+             const {
+               video: newVideo,
+               canvas,
+               context,
+             } = await createVideoAndCanvas(dimensions);
+             video = newVideo;
+             video.crossOrigin = "anonymous";
+             video.muted = true;
+             video.preload = "auto"; // Use auto preload for better loading
+             video.playsInline = true;
+             video.src = processedVideoSrc;
 
-      await new Promise<void>((resolve, reject) => {
-        let loadAttempts = 0;
-        const MAX_LOAD_ATTEMPTS = 3;
+             await new Promise<void>((resolve, reject) => {
+               let loadAttempts = 0;
+               const MAX_LOAD_ATTEMPTS = 5; // Increased from 3 to 5
 
-        const attemptLoad = () => {
-          loadAttempts++;
-          video!.load();
+               const attemptLoad = () => {
+                 loadAttempts++;
+                 console.log(`useKeyframes: Attempting video load ${loadAttempts}/${MAX_LOAD_ATTEMPTS} for:`, processedVideoSrc);
+                 video!.load();
 
-          const onLoad = () => {
-            if (video!.readyState >= 2) {
-              cleanup();
-              resolve();
-            } else if (loadAttempts < MAX_LOAD_ATTEMPTS) {
-              cleanup();
-              attemptLoad();
-            } else {
-              cleanup();
-              reject(
-                new Error(
-                  `Video failed to reach ready state after ${MAX_LOAD_ATTEMPTS} attempts`
-                )
-              );
-            }
-          };
+                 const onLoad = () => {
+                   console.log(`useKeyframes: Video load attempt ${loadAttempts} - readyState:`, video!.readyState);
+                   if (video!.readyState >= 2) {
+                     cleanup();
+                     resolve();
+                   } else if (loadAttempts < MAX_LOAD_ATTEMPTS) {
+                     cleanup();
+                     // Add delay between retries for slower videos
+                     setTimeout(() => attemptLoad(), 2000);
+                   } else {
+                     cleanup();
+                     reject(
+                       new Error(
+                         `Video failed to reach ready state after ${MAX_LOAD_ATTEMPTS} attempts`
+                       )
+                     );
+                   }
+                 };
 
-          const onError = (e: ErrorEvent) => {
-            cleanup();
-            if (loadAttempts < MAX_LOAD_ATTEMPTS) {
-              attemptLoad();
-            } else {
-              reject(
-                new Error(
-                  `Video load failed after ${MAX_LOAD_ATTEMPTS} attempts: ${e.message}`
-                )
-              );
-            }
-          };
+                 const onError = (e: ErrorEvent) => {
+                   console.warn(`useKeyframes: Video load error on attempt ${loadAttempts}:`, e);
+                   cleanup();
+                   if (loadAttempts < MAX_LOAD_ATTEMPTS) {
+                     // Add delay between retries for failed loads
+                     setTimeout(() => attemptLoad(), 3000);
+                   } else {
+                     reject(
+                       new Error(
+                         `Video load failed after ${MAX_LOAD_ATTEMPTS} attempts: ${e.message}`
+                       )
+                     );
+                   }
+                 };
 
-          const cleanup = () => {
-            video!.removeEventListener("loadeddata", onLoad);
-            video!.removeEventListener("error", onError);
-          };
+                 const cleanup = () => {
+                   video!.removeEventListener("loadeddata", onLoad);
+                   video!.removeEventListener("error", onError);
+                 };
 
-          video!.addEventListener("loadeddata", onLoad);
-          video!.addEventListener("error", onError);
-        };
+                 video!.addEventListener("loadeddata", onLoad);
+                 video!.addEventListener("error", onError);
+               };
 
-        attemptLoad();
-      });
+               attemptLoad();
+             });
 
       const frameCount = calculateFrameCount();
       const frameInterval = Math.max(
@@ -380,15 +418,12 @@ export const useKeyframes = ({
               );
               retryCount++;
 
-              if (retryCount < MAX_RETRIES) {
-                // Exponential backoff for retries
-                await new Promise((resolve) =>
-                  setTimeout(
-                    resolve,
-                    Math.min(100 * Math.pow(2, retryCount), 1000)
-                  )
-                );
-              }
+                     if (retryCount < MAX_RETRIES) {
+                       // Longer delays for retries to handle slower videos
+                       const delay = Math.min(1000 * Math.pow(1.5, retryCount), 5000);
+                       console.log(`useKeyframes: Waiting ${delay}ms before retry ${retryCount + 1}/${MAX_RETRIES} for frame ${frameNumber}`);
+                       await new Promise((resolve) => setTimeout(resolve, delay));
+                     }
             }
           }
           
@@ -454,8 +489,17 @@ export const useKeyframes = ({
   ]);
 
   React.useEffect(() => {
+    console.log("useKeyframes: useEffect triggered", {
+      disabled: DISABLE_VIDEO_KEYFRAMES,
+      overlayType: overlayMeta.type,
+      overlayId: overlayMeta.id
+    });
+    
     if (!DISABLE_VIDEO_KEYFRAMES) {
+      console.log("useKeyframes: Calling performExtraction");
       performExtraction();
+    } else {
+      console.log("useKeyframes: Video keyframes disabled");
     }
     return () => cleanup();
   }, [performExtraction, cleanup]);
