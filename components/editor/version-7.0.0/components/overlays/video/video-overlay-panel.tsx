@@ -14,6 +14,9 @@ import { VideoDetails } from "./video-details";
 import VideoSelector from "./video-selector";
 import config from "@/config/config";
 
+// Note: Removed thumbnail generation functions since we now use video file directly
+// The TimelineKeyframes component handles extracting frames from the video URL
+
 interface PexelsVideoFile {
   quality: string;
   link: string;
@@ -81,7 +84,7 @@ export const VideoOverlayPanel: React.FC = () => {
   };
 
   // Handle video selection from video selector
-  const handleVideoSelect = (videoData: any) => {
+  const handleVideoSelect = async (videoData: any) => {
     console.log("Selected video data in overlay panel:", videoData);
     
     // Calculate duration in frames first (default to 200 frames if duration is not available)
@@ -114,15 +117,12 @@ export const VideoOverlayPanel: React.FC = () => {
       return;
     }
 
-    // Build thumbnail URL with fallbacks
-    let thumbnailUrl = "";
-    if (videoData.start_image_url) {
-      thumbnailUrl = videoData.start_image_url;
-    } else if (videoData.start_image) {
-      thumbnailUrl = videoData.start_image;
-    } else {
-      thumbnailUrl = videoUrl; // Use video URL as thumbnail if no separate thumbnail
-    }
+    // Use video file directly for timeline display
+    // The TimelineKeyframes component will handle extracting frames from the video URL
+    console.log("Using video file directly for timeline display:", videoUrl);
+    
+    // Set the video URL as the content - this will be used by TimelineKeyframes to extract frames
+    const thumbnailUrl = videoUrl;
     
     const newOverlay: Overlay = {
       left: 0,

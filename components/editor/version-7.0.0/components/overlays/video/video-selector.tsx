@@ -651,12 +651,15 @@ export default function VideoSelector({
     
     // Ensure the video has the correct URL before passing it
     const videoUrl = getVideoUrl(video);
+    const thumbnailUrl = getThumbnailUrl(video);
     const videoWithUrl = {
       ...video,
       video_url: videoUrl,
+      thumbnail_url: thumbnailUrl,
     };
     
     console.log("Video URL constructed:", videoUrl);
+    console.log("Thumbnail URL constructed:", thumbnailUrl);
     console.log("Video data being passed to overlay panel:", videoWithUrl);
     
     onVideoSelect(videoWithUrl);
@@ -719,6 +722,12 @@ export default function VideoSelector({
 
     // For local/relative URLs, return as-is
     return videoUrl;
+  };
+
+  const getThumbnailUrl = (video: VideoData) => {
+    // Always return empty string since we now use video file directly
+    // The TimelineKeyframes component will handle extracting frames from the video URL
+    return "";
   };
 
   const formatVideoDuration = (seconds: number) => {
