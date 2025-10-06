@@ -116,14 +116,15 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   // Debug logging for waveform data
   React.useEffect(() => {
     if (item.type === OverlayType.SOUND) {
+      const soundSrc = "src" in item ? item.src : undefined;
       console.log("TimelineItem - Sound overlay:", {
         id: item.id,
-        src: item.src,
+        src: soundSrc,
         waveformData: waveformData,
         hasWaveformData: !!waveformData
       });
     }
-  }, [item.type, item.id, item.src, waveformData]);
+  }, [item.type, item.id, "src" in item ? item.src : undefined, waveformData]);
 
   const isSelected = selectedItem?.id === item.id;
   const itemRef = useRef<HTMLDivElement>(null);
