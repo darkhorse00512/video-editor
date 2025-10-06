@@ -98,7 +98,17 @@ export const TimelineKeyframes: React.FC<TimelineKeyframesProps> = ({
               }`}
               style={{ width: `${100 / TOTAL_SLOTS}%` }}
             >
-              {frame && (
+              {/* Show loading state while extracting frames */}
+              {isLoading && !frame ? (
+                <div className="relative h-full w-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Extracting frame...
+                    </span>
+                  </div>
+                </div>
+              ) : frame ? (
                 <div className="relative h-full w-full group">
                   <Image
                     src={frame}
@@ -113,7 +123,27 @@ export const TimelineKeyframes: React.FC<TimelineKeyframesProps> = ({
                       imageRendering: "crisp-edges",
                       objectFit: "cover",
                     }}
+                    onError={(e) => {
+                      console.error(`Failed to load frame image: ${frame}`);
+                      // Hide the broken image
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
                   />
+                </div>
+              ) : (
+                // Show placeholder when no frame is available and not loading
+                <div className="relative h-full w-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="w-4 h-4 text-gray-400 dark:text-gray-500">
+                      <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/>
+                      </svg>
+                    </div>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                      No frame
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

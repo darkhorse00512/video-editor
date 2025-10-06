@@ -3,6 +3,7 @@ import { ImageOverlay, OverlayType, ClipOverlay } from "../types";
 import { DISABLE_VIDEO_KEYFRAMES, FPS } from "../constants";
 import { useKeyframeContext } from "../contexts/keyframe-context";
 import { toAbsoluteUrl } from "../utils/url-helper";
+import { extractVideoFrame } from "../utils/video-frame-extractor";
 
 interface UseKeyframesProps {
   overlay: ClipOverlay | ImageOverlay;
@@ -56,6 +57,7 @@ export const useKeyframes = ({
     () => ({
       id: overlay.id,
       src: "src" in overlay ? overlay.src : undefined,
+      content: "content" in overlay ? overlay.content : undefined,
       durationInFrames:
         "durationInFrames" in overlay ? overlay.durationInFrames : undefined,
       type: overlay.type,
@@ -63,6 +65,7 @@ export const useKeyframes = ({
     [
       overlay.id,
       "src" in overlay ? overlay.src : null,
+      "content" in overlay ? overlay.content : null,
       "durationInFrames" in overlay ? overlay.durationInFrames : null,
       overlay.type,
     ]
@@ -136,20 +139,29 @@ export const useKeyframes = ({
 
   // Move the extraction logic into a separate function
   const performExtraction = React.useCallback(async () => {
-    if (overlayMeta.type !== OverlayType.VIDEO || !overlayMeta.src) return;
+    if (overlayMeta.type !== OverlayType.VIDEO) return;
+    
+    // Get the video URL from either src or content property
+    const videoUrl = overlayMeta.src || overlayMeta.content;
+    if (!videoUrl) {
+      console.warn("No video URL found in overlay:", overlayMeta);
+      return;
+    }
+    
+    console.log("Extracting frames from video URL:", videoUrl, "for overlay:", overlayMeta.id);
 
     // Check if we need to re-extract frames
     const previousOverlay = previousOverlayRef.current;
     const shouldReextract =
       !previousOverlay ||
       String(previousOverlay.id) !== String(overlayMeta.id) ||
-      previousOverlay.src !== overlayMeta.src ||
+      previousOverlay.src !== videoUrl ||
       previousOverlay.durationInFrames !== overlayMeta.durationInFrames;
 
     // Update previous overlay reference
     previousOverlayRef.current = {
       id: overlayMeta.id,
-      src: overlayMeta.src,
+      src: videoUrl,
       durationInFrames: overlayMeta.durationInFrames,
     };
 
@@ -187,14 +199,14 @@ export const useKeyframes = ({
       }
 
       // Process video source URL consistently with video-layer-content
-      let processedVideoSrc = overlayMeta.src;
+      let processedVideoSrc = videoUrl;
       // If it's a relative URL and baseUrl is provided
-      if (overlayMeta.src.startsWith("/") && baseUrl) {
-        processedVideoSrc = `${baseUrl}${overlayMeta.src}`;
+      if (videoUrl.startsWith("/") && baseUrl) {
+        processedVideoSrc = `${baseUrl}${videoUrl}`;
       }
       // Otherwise use the toAbsoluteUrl helper for relative URLs
-      else if (overlayMeta.src.startsWith("/")) {
-        processedVideoSrc = toAbsoluteUrl(overlayMeta.src);
+      else if (videoUrl.startsWith("/")) {
+        processedVideoSrc = toAbsoluteUrl(videoUrl);
       }
 
       // Create a temporary video element to get dimensions
@@ -319,10 +331,9 @@ export const useKeyframes = ({
       );
 
       const extractedFrames: FrameInfo[] = [];
-      const FRAME_TIMEOUT = 8000;
-      const SEEK_TIMEOUT = 1000;
-      const EXTRACTION_BATCH_SIZE = 5; // Process frames in smaller batches
+      const EXTRACTION_BATCH_SIZE = 3; // Smaller batches for better performance
 
+      // Extract frames using the utility function for better reliability
       extractionLoop: for (
         let i = 0;
         i < frameNumbers.length;
@@ -333,92 +344,33 @@ export const useKeyframes = ({
           i + EXTRACTION_BATCH_SIZE
         );
 
-        for (const frameNumber of batchFrameNumbers) {
+        // Extract frames in parallel for better performance
+        const framePromises = batchFrameNumbers.map(async (frameNumber) => {
+          const timeInSeconds = frameNumber / FPS;
           let retryCount = 0;
-          let frameExtracted = false;
-
-          while (retryCount < MAX_RETRIES && !frameExtracted) {
+          
+          while (retryCount < MAX_RETRIES) {
             try {
-              const timeInSeconds = frameNumber / FPS;
-
-              // Seek with timeout and better error handling
-              const seekPromise = new Promise<void>((resolve, reject) => {
-                let seekTimeout = setTimeout(() => {
-                  reject(new Error("Seek timeout"));
-                }, SEEK_TIMEOUT);
-
-                const onSeeked = () => {
-                  clearTimeout(seekTimeout);
-                  video!.removeEventListener("seeked", onSeeked);
-                  resolve();
+              // Use the utility function for frame extraction
+              console.log(`Extracting frame ${frameNumber} at ${timeInSeconds}s from:`, processedVideoSrc);
+              const dataUrl = await extractVideoFrame(processedVideoSrc, timeInSeconds);
+              
+              if (dataUrl && dataUrl.startsWith("data:image")) {
+                console.log(`Successfully extracted frame ${frameNumber}:`, dataUrl.substring(0, 50) + "...");
+                const frameInfo: FrameInfo = {
+                  frameNumber,
+                  dataUrl,
                 };
-
-                const onError = (error: ErrorEvent) => {
-                  clearTimeout(seekTimeout);
-                  video!.removeEventListener("seeked", onSeeked);
-                  video!.removeEventListener("error", onError);
-                  reject(new Error(`Seek error: ${error.message}`));
-                };
-
-                video!.addEventListener("seeked", onSeeked);
-                video!.addEventListener("error", onError);
-
-                seekTimeout = setTimeout(() => {
-                  video!.removeEventListener("seeked", onSeeked);
-                  video!.removeEventListener("error", onError);
-                  reject(new Error("Seek timeout"));
-                }, SEEK_TIMEOUT);
-
-                video!.currentTime = timeInSeconds;
-              });
-
-              await seekPromise;
-
-              // Extract frame with timeout and better error handling
-              await new Promise<void>((resolve, reject) => {
-                const extractFrame = () => {
-                  try {
-                    // Ensure video is still valid
-                    if (!video!.videoWidth || !video!.videoHeight) {
-                      throw new Error(
-                        "Invalid video dimensions during extraction"
-                      );
-                    }
-
-                    context.drawImage(
-                      video!,
-                      0,
-                      0,
-                      canvas.width,
-                      canvas.height
-                    );
-                    const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
-
-                    if (!dataUrl.startsWith("data:image")) {
-                      throw new Error("Invalid frame data URL");
-                    }
-
-                    extractedFrames.push({
-                      frameNumber,
-                      dataUrl,
-                    });
-                    setFrames([...extractedFrames]);
-                    resolve();
-                  } catch (error) {
-                    reject(error);
-                  }
-                };
-
-                // Add a small delay before extraction to ensure frame is ready
-                setTimeout(extractFrame, 50);
-
-                // Set timeout for the entire extraction process
-                setTimeout(() => {
-                  reject(new Error("Frame extraction timeout"));
-                }, FRAME_TIMEOUT);
-              });
-
-              frameExtracted = true;
+                
+                // Update frames immediately for better UX
+                extractedFrames.push(frameInfo);
+                setFrames([...extractedFrames]);
+                
+                return frameInfo;
+              } else {
+                console.error(`Failed to extract frame ${frameNumber}:`, dataUrl);
+                throw new Error("Invalid frame data URL returned");
+              }
             } catch (error) {
               console.warn(
                 `Frame extraction failed for frame ${frameNumber} (attempt ${
@@ -428,34 +380,42 @@ export const useKeyframes = ({
               );
               retryCount++;
 
-              if (retryCount === MAX_RETRIES) {
-                extractionErrors++;
-                if (
-                  extractionErrors >= MAX_ERRORS &&
-                  extractedFrames.length > 0
-                ) {
-                  console.warn(
-                    `Too many extraction errors (${extractionErrors}), using partial results`
-                  );
-                  break extractionLoop;
-                }
+              if (retryCount < MAX_RETRIES) {
+                // Exponential backoff for retries
+                await new Promise((resolve) =>
+                  setTimeout(
+                    resolve,
+                    Math.min(100 * Math.pow(2, retryCount), 1000)
+                  )
+                );
               }
-
-              // Exponential backoff for retries
-              await new Promise((resolve) =>
-                setTimeout(
-                  resolve,
-                  Math.min(100 * Math.pow(2, retryCount), 1000)
-                )
-              );
             }
           }
+          
+          console.error(
+            `Failed to extract frame ${frameNumber} after ${MAX_RETRIES} attempts`
+          );
+          return null;
+        });
 
-          if (!frameExtracted) {
-            console.error(
-              `Failed to extract frame ${frameNumber} after ${MAX_RETRIES} attempts`
-            );
-          }
+        // Wait for all frames in this batch to complete
+        const batchResults = await Promise.allSettled(framePromises);
+        
+        // Check for too many failures
+        const failedFrames = batchResults.filter(result => 
+          result.status === 'rejected' || result.value === null
+        ).length;
+        
+        extractionErrors += failedFrames;
+        
+        if (
+          extractionErrors >= MAX_ERRORS &&
+          extractedFrames.length > 0
+        ) {
+          console.warn(
+            `Too many extraction errors (${extractionErrors}), using partial results`
+          );
+          break extractionLoop;
         }
 
         // Add a small delay between batches to prevent overload
