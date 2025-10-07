@@ -2,6 +2,7 @@ import { AwsRegion, RenderMediaOnLambdaOutput } from "@remotion/lambda/client";
 import { renderMediaOnLambda } from "@remotion/lambda/client";
 import { RenderRequest } from "@/components/editor/version-7.0.0/types";
 import { executeApi } from "@/components/editor/version-7.0.0/lambda-helpers/api-response";
+import { processOverlaysForLambda } from "@/components/editor/version-7.0.0/utils/url-converter";
 
 import {
   LAMBDA_FUNCTION_NAME,
@@ -52,17 +53,43 @@ export const POST = executeApi<RenderMediaOnLambdaOutput, typeof RenderRequest>(
   RenderRequest,
   async (req, body) => {
     // Debug logging
-    // console.log("Received body:", JSON.stringify(body, null, 2));
-    // console.log("inputProps:", JSON.stringify(body.inputProps, null, 2));
+    console.log("Received body:", JSON.stringify(body, null, 2));
+    console.log("inputProps:", JSON.stringify(body.inputProps, null, 2));
 
     // Validate AWS credentials
     validateAwsCredentials();
 
     try {
+      // Process inputProps to convert video-proxy URLs back to original URLs for Lambda
+      const processedInputProps = {
+        ...body.inputProps,
+        overlays: body.inputProps.overlays ? processOverlaysForLambda(body.inputProps.overlays) : []
+      };
+
+      // Debug: Log URL conversions
+      if (body.inputProps.overlays) {
+        console.log("URL Conversion Debug:");
+        console.log("Original overlays count:", body.inputProps.overlays.length);
+        console.log("Processed overlays count:", processedInputProps.overlays.length);
+        
+        body.inputProps.overlays.forEach((overlay: any, index: number) => {
+          console.log(`Overlay ${index} (${overlay.type}):`, {
+            originalSrc: overlay.src,
+            originalContent: overlay.content,
+            processedSrc: processedInputProps.overlays[index]?.src,
+            processedContent: processedInputProps.overlays[index]?.content,
+            hasAudioUrl: !!overlay.audio_url,
+            originalAudioUrl: overlay.audio_url,
+            processedAudioUrl: processedInputProps.overlays[index]?.audio_url,
+          });
+        });
+      }
+
       console.log("Rendering media on Lambda....");
       console.log("Render request details:", {
         composition: body.id,
-        inputProps: body.inputProps,
+        originalInputProps: body.inputProps,
+        processedInputProps: processedInputProps,
         serveUrl: SITE_NAME,
         functionName: LAMBDA_CONFIG.FUNCTION_NAME,
         region: REGION
@@ -74,7 +101,7 @@ export const POST = executeApi<RenderMediaOnLambdaOutput, typeof RenderRequest>(
         region: REGION as AwsRegion,
         serveUrl: SITE_NAME,
         composition: body.id,
-        inputProps: body.inputProps,
+        inputProps: processedInputProps,
         framesPerLambda: LAMBDA_CONFIG.FRAMES_PER_LAMBDA,
         downloadBehavior: {
           type: "download",

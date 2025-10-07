@@ -117,13 +117,30 @@ export const VideoLayerContent: React.FC<VideoLayerContentProps> = ({
   // Determine the video source URL
   let videoSrc = overlay.src;
 
+  // If it's a video-proxy URL, it should already be converted to original URL by Lambda render route
+  // But if we're still seeing video-proxy URLs, convert them here as a fallback
+  if (videoSrc.includes('/api/video-proxy?url=')) {
+    try {
+      const urlObj = new URL(videoSrc, 'http://localhost:3000'); // Use localhost as base for parsing
+      const encodedUrl = urlObj.searchParams.get('url');
+      if (encodedUrl) {
+        videoSrc = decodeURIComponent(encodedUrl);
+        console.log('VideoLayerContent: Converted video-proxy URL to original:', {
+          original: overlay.src,
+          converted: videoSrc
+        });
+      }
+    } catch (error) {
+      console.error('VideoLayerContent: Error converting video-proxy URL:', error);
+    }
+  }
   // If it's a relative URL and baseUrl is provided, use baseUrl
-  if (overlay.src.startsWith("/") && baseUrl) {
-    videoSrc = `${baseUrl}${overlay.src}`;
+  else if (videoSrc.startsWith("/") && baseUrl) {
+    videoSrc = `${baseUrl}${videoSrc}`;
   }
   // Otherwise use the toAbsoluteUrl helper for relative URLs
-  else if (overlay.src.startsWith("/")) {
-    videoSrc = toAbsoluteUrl(overlay.src);
+  else if (videoSrc.startsWith("/")) {
+    videoSrc = toAbsoluteUrl(videoSrc);
   }
 
   return (
