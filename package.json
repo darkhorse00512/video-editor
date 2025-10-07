@@ -9,6 +9,7 @@
     "lint": "next lint",
     "deploy": "node deploy.mjs",
     "deploy:function": "node deploy-function.mjs",
+    "deploy:bucket": "node deploy-bucket.mjs",
     "deploy:site": "node deploy-site.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
