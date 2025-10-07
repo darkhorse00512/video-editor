@@ -84,12 +84,16 @@ This project uses [Remotion](https://www.remotion.dev/) for video rendering on A
 
 To enable video rendering capabilities:
 
-1. **Set up AWS Credentials**:
+1. **Set up AWS IAM User and Permissions**:
+   - Follow the [AWS IAM Setup Guide](./AWS_IAM_SETUP.md) to create an IAM user with required permissions
+   - This includes Lambda, S3, CloudWatch Logs, and Service Quotas permissions
+
+2. **Set up AWS Credentials**:
    - Copy `env.example` to `.env` in your project root
    - Add your AWS Access Key ID and Secret Access Key
-   - Get these from AWS Console -> IAM -> Users -> Your User -> Security Credentials
+   - Get these from AWS Console → IAM → Users → Your User → Security Credentials
 
-2. **Deploy Remotion Infrastructure**:
+3. **Deploy Remotion Infrastructure**:
    ```bash
    npm run deploy
    ```
@@ -98,7 +102,7 @@ To enable video rendering capabilities:
    - S3 bucket for storing rendered videos
    - Remotion site to AWS S3
 
-3. **Verify Deployment**:
+4. **Verify Deployment**:
    - The deploy script will output the deployed site name (usually "sams-site")
    - Check AWS S3 console to confirm the site was uploaded
 

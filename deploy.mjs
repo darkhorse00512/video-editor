@@ -44,14 +44,39 @@ if (
 
 process.stdout.write("Deploying Lambda function... ");
 
-const { functionName, alreadyExisted: functionAlreadyExisted } =
-  await deployFunction({
-    createCloudWatchLogGroup: true,
-    memorySizeInMb: RAM,
-    region: REGION,
-    timeoutInSeconds: TIMEOUT,
-    diskSizeInMb: DISK,
-  });
+let functionName, functionAlreadyExisted;
+let deployAttempts = 0;
+const MAX_DEPLOY_ATTEMPTS = 3;
+
+while (deployAttempts < MAX_DEPLOY_ATTEMPTS) {
+  try {
+    const result = await deployFunction({
+      createCloudWatchLogGroup: true,
+      memorySizeInMb: RAM,
+      region: REGION,
+      timeoutInSeconds: TIMEOUT,
+      diskSizeInMb: DISK,
+    });
+    functionName = result.functionName;
+    functionAlreadyExisted = result.alreadyExisted;
+    break;
+  } catch (error) {
+    deployAttempts++;
+    if (deployAttempts >= MAX_DEPLOY_ATTEMPTS) {
+      console.error("\n\nFailed to deploy Lambda function after", MAX_DEPLOY_ATTEMPTS, "attempts");
+      console.error("Error:", error.message);
+      console.error("\nTroubleshooting tips:");
+      console.error("1. Check your internet connection");
+      console.error("2. Verify AWS credentials are correct");
+      console.error("3. Check if you're behind a proxy/firewall");
+      console.error("4. Try again with a more stable network connection");
+      process.exit(1);
+    }
+    console.log(`\nAttempt ${deployAttempts} failed, retrying...`);
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
+  }
+}
+
 console.log(
   functionName,
   functionAlreadyExisted ? "(already existed)" : "(created)"

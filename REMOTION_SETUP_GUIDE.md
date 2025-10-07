@@ -4,9 +4,11 @@ This guide will help you set up Remotion video rendering in your Next.js applica
 
 ## Prerequisites
 
-- AWS Account with appropriate permissions
+- AWS Account with appropriate permissions (see [AWS IAM Setup Guide](./AWS_IAM_SETUP.md))
 - Node.js and npm installed
 - Next.js application with Remotion dependencies
+
+**⚠️ Important:** Make sure your AWS IAM user has the correct permissions before proceeding. See the [AWS IAM Setup Guide](./AWS_IAM_SETUP.md) for detailed instructions on setting up the required permissions.
 
 ## Step 1: Environment Setup
 
@@ -30,7 +32,25 @@ This guide will help you set up Remotion video rendering in your Next.js applica
    - Create new Access Key if needed
    - Copy Access Key ID and Secret Access Key
 
-## Step 2: Deploy Remotion Infrastructure
+## Step 2: Verify IAM Permissions
+
+Before deploying, verify your AWS user has the correct permissions:
+
+1. **Check if you can access AWS:**
+   - Try logging into [AWS Console](https://console.aws.amazon.com)
+   - Navigate to IAM → Users → Your User → Permissions
+   - Verify `RemotionLambdaDeployPolicy` is attached
+
+2. **Required Permissions:**
+   - Lambda: Create, delete, invoke functions
+   - S3: Create buckets, upload files
+   - CloudWatch Logs: Create log groups
+   - IAM: Pass role to Lambda
+   - Service Quotas: Check limits
+
+**If you don't have these permissions,** follow the [AWS IAM Setup Guide](./AWS_IAM_SETUP.md) to set them up.
+
+## Step 3: Deploy Remotion Infrastructure
 
 Run the deployment script to set up AWS Lambda and S3:
 
@@ -42,6 +62,8 @@ This will:
 - Create/update Lambda function for video rendering
 - Create/verify S3 bucket for storage
 - Deploy your Remotion site to S3
+
+**Note:** The deployment script will automatically retry up to 3 times if it encounters network issues.
 
 ## Step 3: Verify Configuration
 
@@ -136,6 +158,21 @@ const progress = await progressResponse.json();
 - Increase Lambda memory in `config.mjs`
 - Increase timeout in `config.mjs`
 - Optimize video complexity
+
+### 6. Network Connection Errors (ECONNRESET)
+**Problem:** Deployment fails with connection reset errors
+**Solution:**
+- **Check internet connection:** Ensure stable network connectivity
+- **Test AWS connectivity:** Try accessing AWS Console in browser
+- **Behind proxy/firewall:** Configure proxy settings:
+  ```bash
+  export HTTP_PROXY=http://your-proxy:port
+  export HTTPS_PROXY=http://your-proxy:port
+  npm run deploy
+  ```
+- **VPN issues:** Try disconnecting VPN or switching networks
+- **Retry:** Wait a few minutes and try again - AWS services might be temporarily unavailable
+- **Use different region:** Try changing region in `config.mjs` if your current region has issues
 
 ## File Structure
 
