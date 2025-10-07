@@ -62,7 +62,16 @@ export const convertUrlForLocal = (url: string): string => {
  * @returns Array of overlays with Lambda-compatible URLs
  */
 export const processOverlaysForLambda = (overlays: any[]): any[] => {
-  return overlays.map(overlay => {
+  console.log('processOverlaysForLambda called with:', overlays.length, 'overlays');
+  
+  return overlays.map((overlay, index) => {
+    console.log(`Processing overlay ${index}:`, {
+      type: overlay.type,
+      src: overlay.src,
+      content: overlay.content,
+      audio_url: overlay.audio_url,
+    });
+    
     const processedOverlay = { ...overlay };
     
     // List of properties that might contain URLs
@@ -71,7 +80,12 @@ export const processOverlaysForLambda = (overlays: any[]): any[] => {
     // Convert all URL properties
     urlProperties.forEach(prop => {
       if (processedOverlay[prop] && typeof processedOverlay[prop] === 'string') {
+        const originalValue = processedOverlay[prop];
         processedOverlay[prop] = convertUrlForLambda(processedOverlay[prop]);
+        console.log(`Converted ${prop}:`, {
+          original: originalValue,
+          converted: processedOverlay[prop]
+        });
       }
     });
     
@@ -82,12 +96,24 @@ export const processOverlaysForLambda = (overlays: any[]): any[] => {
       // Convert any URL properties in styles
       urlProperties.forEach(prop => {
         if (processedStyles[prop] && typeof processedStyles[prop] === 'string') {
+          const originalValue = processedStyles[prop];
           processedStyles[prop] = convertUrlForLambda(processedStyles[prop]);
+          console.log(`Converted styles.${prop}:`, {
+            original: originalValue,
+            converted: processedStyles[prop]
+          });
         }
       });
       
       processedOverlay.styles = processedStyles;
     }
+    
+    console.log(`Processed overlay ${index} result:`, {
+      type: processedOverlay.type,
+      src: processedOverlay.src,
+      content: processedOverlay.content,
+      audio_url: processedOverlay.audio_url,
+    });
     
     return processedOverlay;
   });
