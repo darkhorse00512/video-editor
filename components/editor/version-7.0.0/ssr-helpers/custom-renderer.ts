@@ -140,8 +140,9 @@ export async function startRendering(
       const outputPath = `/rendered-videos/${renderId}.mp4`;
       completeRender(renderId, outputPath, stats.size);
       console.log(`Render ${renderId} completed successfully`);
-    } catch (error: any) {
-      failRender(renderId, error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      failRender(renderId, errorMessage);
       console.error(`Render ${renderId} failed:`, error);
     }
   })();
